@@ -373,8 +373,10 @@ async function cargarArbitros() {
 }
 
 document.getElementById('btn-agregar-arbitro').addEventListener('click', async () => {
-  const nombre = document.getElementById('arb-nombre').value.trim();
-  if (!nombre) { toast('El nombre es obligatorio', 'error'); return; }
+  const apellidos = document.getElementById('arb-apellidos').value.trim().toUpperCase();
+  const nombres = document.getElementById('arb-nombres').value.trim().toUpperCase();
+  if (!apellidos || !nombres) { toast('Apellidos y nombres son obligatorios', 'error'); return; }
+  const nombre = `${apellidos}, ${nombres}`;
 
   try {
     await api('/api/arbitros', {
@@ -382,7 +384,8 @@ document.getElementById('btn-agregar-arbitro').addEventListener('click', async (
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ nombre, categoria: '' }),
     });
-    document.getElementById('arb-nombre').value = '';
+    document.getElementById('arb-apellidos').value = '';
+    document.getElementById('arb-nombres').value = '';
     toast('Árbitro registrado ✓');
     cargarArbitros();
   } catch (e) {
