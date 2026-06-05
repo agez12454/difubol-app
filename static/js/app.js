@@ -299,9 +299,15 @@ async function cargarConflictos() {
       </div>
       <div class="conflicto-detalle">
         <strong>Partido 1:</strong> ${c.equipos_origen} — ${c.fecha_origen} (${c.rol_en_este})
+        ${c.competicion_origen ? `<br><i class="fa-solid fa-trophy" style="color:var(--primary);font-size:0.75rem"></i> ${c.competicion_origen}` : ''}
+        ${c.estadio_origen ? `&nbsp;·&nbsp;<i class="fa-solid fa-location-dot" style="color:var(--primary);font-size:0.75rem"></i> ${c.estadio_origen}` : ''}
+        ${c.ciudad_origen ? `, ${c.ciudad_origen}` : ''}
       </div>
       <div class="conflicto-detalle">
         <strong>Partido 2:</strong> ${c.equipos_conflicto} — ${c.fecha_conflicto} (${c.rol_en_conflicto})
+        ${c.competicion_conflicto ? `<br><i class="fa-solid fa-trophy" style="color:var(--primary);font-size:0.75rem"></i> ${c.competicion_conflicto}` : ''}
+        ${c.estadio_conflicto ? `&nbsp;·&nbsp;<i class="fa-solid fa-location-dot" style="color:var(--primary);font-size:0.75rem"></i> ${c.estadio_conflicto}` : ''}
+        ${c.ciudad_conflicto ? `, ${c.ciudad_conflicto}` : ''}
       </div>
       <div style="margin-top:12px">
         <button class="btn btn-sm btn-ghost" onclick="verSugerencias(${c.arbitro_id},${c.partido_origen_id},'${c.arbitro_nombre}')">

@@ -100,6 +100,9 @@ def detectar_conflictos(partido_id: int, db: Session):
                         "partido_conflicto_num": otro_partido.numero,
                         "equipos_conflicto": f"{otro_partido.equipo_local} vs {otro_partido.equipo_visitante}",
                         "fecha_conflicto": otro_partido.fecha_hora.strftime("%d.%m.%Y %H:%M") if otro_partido.fecha_hora else "",
+                        "estadio_conflicto": otro_partido.estadio or "",
+                        "ciudad_conflicto": otro_partido.ciudad or "",
+                        "competicion_conflicto": otro_partido.competicion or "",
                         "rol_en_conflicto": otra.rol,
                         "tipo": "solapamiento" if solapan else "mismo_dia",
                     }
@@ -415,6 +418,9 @@ def todos_los_conflictos(db: Session = Depends(get_db)):
                 c["partido_origen_num"] = p.numero
                 c["equipos_origen"] = f"{p.equipo_local} vs {p.equipo_visitante}"
                 c["fecha_origen"] = p.fecha_hora.strftime("%d.%m.%Y %H:%M") if p.fecha_hora else ""
+                c["estadio_origen"] = p.estadio or ""
+                c["ciudad_origen"] = p.ciudad or ""
+                c["competicion_origen"] = p.competicion or ""
                 todos.append(c)
     return todos
 
