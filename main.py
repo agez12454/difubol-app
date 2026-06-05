@@ -141,17 +141,23 @@ def sugerir_reemplazos(arbitro_id: int, partido_id: int, db: Session):
                 ocupado = True
                 break
         if not ocupado:
-            # Verificar si tiene partido ese mismo día (aunque no se solape)
-            tiene_partido_ese_dia = any(
-                asig.partido.fecha_hora and asig.partido.fecha_hora.date() == partido.fecha_hora.date()
-                for asig in candidato.asignaciones
-                if asig.partido.fecha_hora
-            )
+            # Partidos ese mismo día (sin solapamiento)
+            partidos_ese_dia = []
+            for asig in candidato.asignaciones:
+                p2 = asig.partido
+                if p2.fecha_hora and p2.fecha_hora.date() == partido.fecha_hora.date():
+                    partidos_ese_dia.append({
+                        "hora": p2.fecha_hora.strftime("%H:%M"),
+                        "estadio": p2.estadio or "",
+                        "ciudad": p2.ciudad or "",
+                        "rol": asig.rol,
+                    })
             disponibles.append({
                 "id": candidato.id,
                 "nombre": candidato.nombre,
                 "categoria": candidato.categoria,
-                "aviso_mismo_dia": tiene_partido_ese_dia,
+                "aviso_mismo_dia": len(partidos_ese_dia) > 0,
+                "partidos_ese_dia": partidos_ese_dia,
             })
 
     return disponibles

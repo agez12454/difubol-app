@@ -338,7 +338,11 @@ async function verSugerencias(arbitroId, partidoId, nombre) {
           <div class="sugerencia-item ${s.aviso_mismo_dia ? 'aviso-dia' : ''}">
             <div>
               <div class="nombre">${s.nombre}</div>
-              ${s.aviso_mismo_dia ? `<div class="aviso-dia-tag"><i class="fa-solid fa-circle-exclamation"></i> Tiene otro partido ese día</div>` : ''}
+              ${s.aviso_mismo_dia ? s.partidos_ese_dia.map(p => `
+                <div class="aviso-dia-tag">
+                  <i class="fa-solid fa-circle-exclamation"></i>
+                  Tiene partido ese día a las <strong>${p.hora}</strong>${p.estadio ? ` · ${p.estadio}` : ''}${p.ciudad ? `, ${p.ciudad}` : ''}
+                </div>`).join('') : ''}
             </div>
             <i class="fa-solid fa-circle-check" style="color:var(--success)"></i>
           </div>
