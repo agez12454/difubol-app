@@ -29,6 +29,11 @@ MATCH_DURATION_HOURS = 2  # Duración estimada de un partido
 class ArbitroCreate(BaseModel):
     nombre: str
     categoria: str
+    telefono: Optional[str] = None
+
+
+class ArbitroUpdate(BaseModel):
+    telefono: Optional[str] = None
 
 
 class PartidoManual(BaseModel):
@@ -156,6 +161,7 @@ def sugerir_reemplazos(arbitro_id: int, partido_id: int, db: Session):
                 "id": candidato.id,
                 "nombre": candidato.nombre,
                 "categoria": candidato.categoria,
+                "telefono": candidato.telefono or "",
                 "aviso_mismo_dia": len(partidos_ese_dia) > 0,
                 "partidos_ese_dia": partidos_ese_dia,
             })
@@ -282,6 +288,7 @@ def listar_arbitros(db: Session = Depends(get_db)):
         result.append({
             "id": a.id,
             "nombre": a.nombre,
+            "telefono": a.telefono or "",
             "total_partidos": total,
             "por_rol": conteo,
         })
@@ -292,11 +299,22 @@ def listar_arbitros(db: Session = Depends(get_db)):
 
 @app.post("/api/arbitros")
 def crear_arbitro(data: ArbitroCreate, db: Session = Depends(get_db)):
-    arbitro = Arbitro(nombre=data.nombre.upper().strip(), categoria=data.categoria.upper().strip())
+    arbitro = Arbitro(nombre=data.nombre.upper().strip(), categoria=data.categoria.upper().strip(), telefono=data.telefono)
     db.add(arbitro)
     db.commit()
     db.refresh(arbitro)
     return arbitro
+
+
+@app.patch("/api/arbitros/{arbitro_id}")
+def actualizar_arbitro(arbitro_id: int, data: ArbitroUpdate, db: Session = Depends(get_db)):
+    arbitro = db.query(Arbitro).filter(Arbitro.id == arbitro_id).first()
+    if not arbitro:
+        raise HTTPException(status_code=404, detail="Árbitro no encontrado")
+    if data.telefono is not None:
+        arbitro.telefono = data.telefono.strip()
+    db.commit()
+    return {"id": arbitro.id, "telefono": arbitro.telefono}
 
 
 @app.delete("/api/arbitros/{arbitro_id}")

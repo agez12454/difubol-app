@@ -397,10 +397,10 @@ async function cargarConflictos() {
       <div style="margin-top:14px">
         <p style="font-size:0.8rem;color:var(--text2);margin-bottom:8px"><i class="fa-solid fa-hand-pointer"></i> ¿En cuál partido necesita reemplazo?</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-sm btn-ghost" onclick="verSugerencias(${c.arbitro_id},${c.partido_origen_id},'${c.arbitro_nombre}')">
+          <button class="btn btn-sm btn-ghost" onclick="verSugerencias(${c.arbitro_id},${c.partido_origen_id},'${c.arbitro_nombre}','','${c.equipos_origen} - ${c.fecha_origen} - ${c.estadio_origen}')">
             <i class="fa-solid fa-shuffle"></i> Partido 1: ${c.equipos_origen} (${c.fecha_origen})
           </button>
-          <button class="btn btn-sm btn-ghost" onclick="verSugerencias(${c.arbitro_id},${c.partido_conflicto_id},'${c.arbitro_nombre}')">
+          <button class="btn btn-sm btn-ghost" onclick="verSugerencias(${c.arbitro_id},${c.partido_conflicto_id},'${c.arbitro_nombre}','','${c.equipos_conflicto} - ${c.fecha_conflicto} - ${c.estadio_conflicto}')">
             <i class="fa-solid fa-shuffle"></i> Partido 2: ${c.equipos_conflicto} (${c.fecha_conflicto})
           </button>
         </div>
@@ -410,7 +410,7 @@ async function cargarConflictos() {
 }
 
 // ─── Sugerencias ──────────────────────────────────────────────────────────────
-async function verSugerencias(arbitroId, partidoId, nombre, rol = '') {
+async function verSugerencias(arbitroId, partidoId, nombre, rol = '', partidoInfo = '') {
   const modal = document.getElementById('modal-sugerencias');
   const body = document.getElementById('modal-body');
   body.innerHTML = `<div class="loading"><div class="spinner"></div> Buscando disponibles...</div>`;
@@ -418,6 +418,7 @@ async function verSugerencias(arbitroId, partidoId, nombre, rol = '') {
   modal.dataset.arbitroId = arbitroId;
   modal.dataset.partidoId = partidoId;
   modal.dataset.rol = rol;
+  modal.dataset.partidoInfo = partidoInfo;
 
   try {
     const sugerencias = await api(`/api/sugerencias/${arbitroId}/${partidoId}`);
@@ -438,8 +439,8 @@ async function verSugerencias(arbitroId, partidoId, nombre, rol = '') {
                   Tiene partido ese día a las <strong>${p.hora}</strong>${p.estadio ? ` · ${p.estadio}` : ''}${p.ciudad ? `, ${p.ciudad}` : ''}
                 </div>`).join('') : ''}
             </div>
-            <button class="btn btn-sm btn-success" onclick="asignarReemplazo(${s.id},'${s.nombre}')">
-              <i class="fa-solid fa-check"></i> Asignar
+            <button class="btn btn-sm btn-success" onclick="asignarReemplazo(${s.id},'${s.nombre}','${s.telefono || ''}')">
+              <i class="fa-solid fa-check"></i> Asignar${s.telefono ? ' <i class=\'fa-brands fa-whatsapp\'></i>' : ''}
             </button>
           </div>
         `).join('')}
@@ -450,11 +451,12 @@ async function verSugerencias(arbitroId, partidoId, nombre, rol = '') {
   }
 }
 
-async function asignarReemplazo(reemplazoId, reemplazoNombre) {
+async function asignarReemplazo(reemplazoId, reemplazoNombre, telefono) {
   const modal = document.getElementById('modal-sugerencias');
   const arbitroId = parseInt(modal.dataset.arbitroId);
   const partidoId = parseInt(modal.dataset.partidoId);
   const rol = modal.dataset.rol || 'Árbitro';
+  const partidoInfo = modal.dataset.partidoInfo || '';
 
   try {
     await api('/api/reemplazos', {
@@ -470,6 +472,16 @@ async function asignarReemplazo(reemplazoId, reemplazoNombre) {
     modal.classList.add('hidden');
     toast(`✓ Reemplazo asignado: ${reemplazoNombre}`);
     cargarConflictos();
+    cargarPartidos();
+
+    // Abrir WhatsApp si hay teléfono registrado
+    if (telefono) {
+      const tel = telefono.replace(/\D/g, '');
+      const msg = encodeURIComponent(
+        `Hola ${reemplazoNombre}, te informamos que has sido asignado como reemplazo en el partido:\n\n${partidoInfo}\n\nRol: ${rol}\n\n¿Confirmas tu participación?`
+      );
+      window.open(`https://wa.me/${tel}?text=${msg}`, '_blank');
+    }
   } catch (e) {
     toast(`Error: ${e.message}`, 'error');
   }
@@ -542,6 +554,7 @@ async function cargarArbitros() {
             <th>2° Asist.</th>
             <th>4° Árb.</th>
             <th>Total</th>
+            <th>WhatsApp</th>
             <th></th>
           </tr>
         </thead>
@@ -555,6 +568,14 @@ async function cargarArbitros() {
               <td class="num">${a.por_rol['2° árbitro asistente'] || 0}</td>
               <td class="num">${a.por_rol['Cuarto árbitro'] || 0}</td>
               <td class="num total"><strong>${a.total_partidos}</strong></td>
+              <td>
+                <div class="telefono-cell">
+                  <input class="telefono-input" type="tel" placeholder="573001234567" value="${a.telefono || ''}"
+                    onblur="guardarTelefono(${a.id}, this.value)"
+                    title="Número WhatsApp con código de país (ej: 573001234567)" />
+                  ${a.telefono ? `<a href="https://wa.me/${a.telefono.replace(/\D/g,'')}" target="_blank" class="btn-wa" title="Abrir WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>` : ''}
+                </div>
+              </td>
               <td><button class="btn btn-sm btn-danger" onclick="eliminarArbitro(${a.id})"><i class="fa-solid fa-trash"></i></button></td>
             </tr>
           `).join('')}
@@ -646,6 +667,21 @@ document.getElementById('btn-agregar-arbitro').addEventListener('click', async (
     toast(`Error: ${e.message}`, 'error');
   }
 });
+
+async function guardarTelefono(id, telefono) {
+  const tel = telefono.replace(/\D/g, '');
+  try {
+    await api(`/api/arbitros/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ telefono: tel }),
+    });
+    if (tel) toast('Teléfono guardado ✓');
+    cargarArbitros();
+  } catch (e) {
+    toast(`Error: ${e.message}`, 'error');
+  }
+}
 
 async function eliminarArbitro(id) {
   if (!confirm('¿Eliminar este árbitro?')) return;

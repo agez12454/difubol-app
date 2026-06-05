@@ -269,6 +269,27 @@ main { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
 }
 .btn-confirmar:hover { border-color: #2ecc71; color: #2ecc71; }
 .btn-confirmar.confirmado { border-color: #2ecc71; color: #2ecc71; background: rgba(46,204,113,0.1); }
+
+/* ─── Teléfono árbitros ─── */
+.telefono-cell { display: flex; align-items: center; gap: 6px; }
+.telefono-input {
+  background: var(--bg3, #1a1d27);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 5px;
+  color: var(--text);
+  font-size: 0.78rem;
+  padding: 3px 7px;
+  width: 130px;
+  outline: none;
+}
+.telefono-input:focus { border-color: var(--primary); }
+.btn-wa {
+  color: #25d366;
+  font-size: 1.1rem;
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+.btn-wa:hover { opacity: 0.75; }
 .reemplazo-inline {
   color: #2ecc71;
   font-weight: 600;

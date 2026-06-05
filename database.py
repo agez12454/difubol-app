@@ -16,6 +16,7 @@ class Arbitro(Base):
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String, nullable=False)
     categoria = Column(String, nullable=False)  # Ej: ANTIOQUIA AAA
+    telefono = Column(String, nullable=True)
     activo = Column(Boolean, default=True)
     creado_en = Column(DateTime, default=datetime.utcnow)
 
