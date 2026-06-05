@@ -282,6 +282,7 @@ async function eliminarPartido(id) {
 
 // ─── Conflictos ───────────────────────────────────────────────────────────────
 async function cargarConflictos() {
+  cargarReemplazos();
   const conflictos = await api('/api/conflictos');
   const cont = document.getElementById('lista-conflictos');
 
@@ -325,11 +326,14 @@ async function cargarConflictos() {
 }
 
 // ─── Sugerencias ──────────────────────────────────────────────────────────────
-async function verSugerencias(arbitroId, partidoId, nombre) {
+async function verSugerencias(arbitroId, partidoId, nombre, rol = '') {
   const modal = document.getElementById('modal-sugerencias');
   const body = document.getElementById('modal-body');
   body.innerHTML = `<div class="loading"><div class="spinner"></div> Buscando disponibles...</div>`;
   modal.classList.remove('hidden');
+  modal.dataset.arbitroId = arbitroId;
+  modal.dataset.partidoId = partidoId;
+  modal.dataset.rol = rol;
 
   try {
     const sugerencias = await api(`/api/sugerencias/${arbitroId}/${partidoId}`);
@@ -342,7 +346,7 @@ async function verSugerencias(arbitroId, partidoId, nombre) {
         </p>
         ${sugerencias.map(s => `
           <div class="sugerencia-item ${s.aviso_mismo_dia ? 'aviso-dia' : ''}">
-            <div>
+            <div style="flex:1">
               <div class="nombre">${s.nombre}</div>
               ${s.aviso_mismo_dia ? s.partidos_ese_dia.map(p => `
                 <div class="aviso-dia-tag">
@@ -350,7 +354,9 @@ async function verSugerencias(arbitroId, partidoId, nombre) {
                   Tiene partido ese día a las <strong>${p.hora}</strong>${p.estadio ? ` · ${p.estadio}` : ''}${p.ciudad ? `, ${p.ciudad}` : ''}
                 </div>`).join('') : ''}
             </div>
-            <i class="fa-solid fa-circle-check" style="color:var(--success)"></i>
+            <button class="btn btn-sm btn-success" onclick="asignarReemplazo(${s.id},'${s.nombre}')">
+              <i class="fa-solid fa-check"></i> Asignar
+            </button>
           </div>
         `).join('')}
       `;
@@ -358,6 +364,67 @@ async function verSugerencias(arbitroId, partidoId, nombre) {
   } catch (e) {
     body.innerHTML = `<div class="no-sugerencias" style="color:var(--danger)">Error cargando sugerencias</div>`;
   }
+}
+
+async function asignarReemplazo(reemplazoId, reemplazoNombre) {
+  const modal = document.getElementById('modal-sugerencias');
+  const arbitroId = parseInt(modal.dataset.arbitroId);
+  const partidoId = parseInt(modal.dataset.partidoId);
+  const rol = modal.dataset.rol || 'Árbitro';
+
+  try {
+    await api('/api/reemplazos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        partido_id: partidoId,
+        arbitro_original_id: arbitroId,
+        arbitro_reemplazo_id: reemplazoId,
+        rol: rol,
+      }),
+    });
+    modal.classList.add('hidden');
+    toast(`✓ Reemplazo asignado: ${reemplazoNombre}`);
+    cargarConflictos();
+  } catch (e) {
+    toast(`Error: ${e.message}`, 'error');
+  }
+}
+
+async function cargarReemplazos() {
+  const reemplazos = await api('/api/reemplazos');
+  const cont = document.getElementById('reemplazos-confirmados');
+  if (reemplazos.length === 0) { cont.innerHTML = ''; return; }
+
+  cont.innerHTML = `
+    <div class="card" style="border-color:rgba(46,204,113,0.3);margin-bottom:16px">
+      <h3 style="color:var(--success);margin-bottom:14px"><i class="fa-solid fa-circle-check"></i> Reemplazos confirmados</h3>
+      ${reemplazos.map(r => `
+        <div class="reemplazo-item">
+          <div class="reemplazo-info">
+            <div>
+              <span class="reemplazo-nombre">${r.arbitro_reemplazo}</span>
+              <span style="color:var(--text2);font-size:0.85rem"> reemplaza a </span>
+              <span class="reemplazo-nombre">${r.arbitro_original}</span>
+            </div>
+            <div style="font-size:0.8rem;color:var(--text2);margin-top:4px">
+              <i class="fa-solid fa-calendar"></i> ${r.fecha} &nbsp;·&nbsp;
+              <i class="fa-solid fa-trophy"></i> ${r.competicion} &nbsp;·&nbsp;
+              <i class="fa-solid fa-location-dot"></i> ${r.estadio}${r.ciudad ? ', ' + r.ciudad : ''}
+            </div>
+            <div style="font-size:0.78rem;color:var(--text2);margin-top:2px">
+              ${r.partido} · <em>${r.rol}</em>
+            </div>
+          </div>
+          <button class="btn btn-sm btn-danger" onclick="eliminarReemplazo(${r.id})"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      `).join('')}
+    </div>`;
+}
+
+async function eliminarReemplazo(id) {
+  await api(`/api/reemplazos/${id}`, { method: 'DELETE' });
+  cargarConflictos();
 }
 
 document.getElementById('cerrar-modal').addEventListener('click', () => {

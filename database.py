@@ -53,6 +53,21 @@ class AsignacionPartido(Base):
     arbitro = relationship("Arbitro", back_populates="asignaciones")
 
 
+class Reemplazo(Base):
+    __tablename__ = "reemplazos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    partido_id = Column(Integer, ForeignKey("partidos.id"))
+    arbitro_original_id = Column(Integer, ForeignKey("arbitros.id"))
+    arbitro_reemplazo_id = Column(Integer, ForeignKey("arbitros.id"))
+    rol = Column(String)
+    creado_en = Column(DateTime, default=datetime.utcnow)
+
+    partido = relationship("Partido")
+    arbitro_original = relationship("Arbitro", foreign_keys=[arbitro_original_id])
+    arbitro_reemplazo = relationship("Arbitro", foreign_keys=[arbitro_reemplazo_id])
+
+
 def get_db():
     db = SessionLocal()
     try:

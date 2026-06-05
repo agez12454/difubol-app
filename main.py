@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 import httpx
 
-from database import get_db, init_db, Arbitro, Partido, AsignacionPartido  # noqa: E402
+from database import get_db, init_db, Arbitro, Partido, AsignacionPartido, Reemplazo  # noqa: E402
 
 load_dotenv()
 init_db()
@@ -445,6 +445,174 @@ def todos_los_conflictos(db: Session = Depends(get_db)):
 @app.get("/api/sugerencias/{arbitro_id}/{partido_id}")
 def sugerencias(arbitro_id: int, partido_id: int, db: Session = Depends(get_db)):
     return sugerir_reemplazos(arbitro_id, partido_id, db)
+
+
+# ─── Reemplazos ──────────────────────────────────────────────────────────────
+
+class ReemplazoCreate(BaseModel):
+    partido_id: int
+    arbitro_original_id: int
+    arbitro_reemplazo_id: int
+    rol: str
+
+
+@app.get("/api/reemplazos")
+def listar_reemplazos(db: Session = Depends(get_db)):
+    reemplazos = db.query(Reemplazo).order_by(Reemplazo.creado_en.desc()).all()
+    return [{
+        "id": r.id,
+        "partido_id": r.partido_id,
+        "partido": f"{r.partido.equipo_local} vs {r.partido.equipo_visitante}",
+        "fecha": r.partido.fecha_hora.strftime("%d.%m.%Y %H:%M") if r.partido.fecha_hora else "",
+        "estadio": r.partido.estadio or "",
+        "ciudad": r.partido.ciudad or "",
+        "competicion": r.partido.competicion or "",
+        "arbitro_original": r.arbitro_original.nombre,
+        "arbitro_reemplazo": r.arbitro_reemplazo.nombre,
+        "rol": r.rol,
+    } for r in reemplazos]
+
+
+@app.post("/api/reemplazos")
+def crear_reemplazo(data: ReemplazoCreate, db: Session = Depends(get_db)):
+    # Evitar duplicados
+    existe = db.query(Reemplazo).filter(
+        Reemplazo.partido_id == data.partido_id,
+        Reemplazo.arbitro_original_id == data.arbitro_original_id,
+    ).first()
+    if existe:
+        existe.arbitro_reemplazo_id = data.arbitro_reemplazo_id
+        existe.rol = data.rol
+        db.commit()
+        return {"id": existe.id}
+    r = Reemplazo(**data.dict())
+    db.add(r)
+    db.commit()
+    db.refresh(r)
+    return {"id": r.id}
+
+
+@app.delete("/api/reemplazos/{reemplazo_id}")
+def eliminar_reemplazo(reemplazo_id: int, db: Session = Depends(get_db)):
+    r = db.query(Reemplazo).filter(Reemplazo.id == reemplazo_id).first()
+    if r:
+        db.delete(r)
+        db.commit()
+    return {"ok": True}
+
+
+# ─── Exportar Excel ──────────────────────────────────────────────────────────
+
+@app.get("/api/exportar/excel")
+def exportar_excel(db: Session = Depends(get_db)):
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from fastapi.responses import StreamingResponse
+    import io
+
+    wb = openpyxl.Workbook()
+
+    # ── Hoja 1: Conflictos con reemplazos ──
+    ws1 = wb.active
+    ws1.title = "Conflictos y Reemplazos"
+
+    header_fill = PatternFill("solid", fgColor="1a1d27")
+    red_fill = PatternFill("solid", fgColor="e84040")
+    orange_fill = PatternFill("solid", fgColor="f5a623")
+    green_fill = PatternFill("solid", fgColor="2ecc71")
+    bold = Font(bold=True, color="FFFFFF")
+    center = Alignment(horizontal="center", vertical="center")
+
+    headers = ["ÁRBITRO", "TIPO", "PARTIDO 1", "FECHA 1", "CANCHA 1", "COMPETICIÓN 1",
+               "PARTIDO 2", "FECHA 2", "CANCHA 2", "COMPETICIÓN 2", "REEMPLAZO ASIGNADO", "REEMPLAZA EN"]
+    ws1.append(headers)
+    for col, h in enumerate(headers, 1):
+        cell = ws1.cell(row=1, column=col)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="3d7df7")
+        cell.alignment = center
+
+    # Obtener conflictos
+    partidos = db.query(Partido).all()
+    vistos = set()
+    filas = []
+    for p in partidos:
+        for c in detectar_conflictos(p.id, db):
+            clave = tuple(sorted([p.id, c["partido_conflicto_id"], c["arbitro_id"]]))
+            if clave not in vistos:
+                vistos.add(clave)
+                # Buscar reemplazo asignado
+                reemplazo = db.query(Reemplazo).filter(
+                    Reemplazo.partido_id.in_([p.id, c["partido_conflicto_id"]]),
+                    Reemplazo.arbitro_original_id == c["arbitro_id"]
+                ).first()
+                filas.append({
+                    "arbitro": c["arbitro_nombre"],
+                    "tipo": "SOLAPAMIENTO" if c["tipo"] == "solapamiento" else "MISMO DÍA",
+                    "partido1": f"{p.equipo_local} vs {p.equipo_visitante}",
+                    "fecha1": p.fecha_hora.strftime("%d.%m.%Y %H:%M") if p.fecha_hora else "",
+                    "cancha1": f"{p.estadio or ''} {p.ciudad or ''}".strip(),
+                    "comp1": p.competicion or "",
+                    "partido2": c["equipos_conflicto"],
+                    "fecha2": c["fecha_conflicto"],
+                    "cancha2": f"{c.get('estadio_conflicto','') } {c.get('ciudad_conflicto','')}".strip(),
+                    "comp2": c.get("competicion_conflicto", ""),
+                    "reemplazo": reemplazo.arbitro_reemplazo.nombre if reemplazo else "Sin asignar",
+                    "reemplaza_en": f"{reemplazo.partido.equipo_local} vs {reemplazo.partido.equipo_visitante}" if reemplazo else "",
+                })
+
+    for i, f in enumerate(filas, 2):
+        row = [f["arbitro"], f["tipo"], f["partido1"], f["fecha1"], f["cancha1"], f["comp1"],
+               f["partido2"], f["fecha2"], f["cancha2"], f["comp2"], f["reemplazo"], f["reemplaza_en"]]
+        ws1.append(row)
+        fill = PatternFill("solid", fgColor="2a1a1a") if f["tipo"] == "SOLAPAMIENTO" else PatternFill("solid", fgColor="2a2200")
+        for col in range(1, len(row) + 1):
+            cell = ws1.cell(row=i, column=col)
+            cell.fill = fill
+            if col == 11 and f["reemplazo"] != "Sin asignar":
+                cell.font = Font(bold=True, color="2ecc71")
+            elif col == 11:
+                cell.font = Font(color="e84040")
+
+    # Ajustar anchos
+    for col in ws1.columns:
+        max_len = max((len(str(cell.value or "")) for cell in col), default=10)
+        ws1.column_dimensions[col[0].column_letter].width = min(max_len + 4, 40)
+
+    # ── Hoja 2: Reemplazos confirmados ──
+    ws2 = wb.create_sheet("Reemplazos Confirmados")
+    h2 = ["ÁRBITRO REEMPLAZADO", "REEMPLAZADO POR", "ROL", "PARTIDO", "FECHA", "CANCHA", "CIUDAD", "COMPETICIÓN"]
+    ws2.append(h2)
+    for col, h in enumerate(h2, 1):
+        cell = ws2.cell(row=1, column=col)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="2ecc71")
+        cell.alignment = center
+
+    reemplazos = db.query(Reemplazo).all()
+    for r in reemplazos:
+        ws2.append([
+            r.arbitro_original.nombre,
+            r.arbitro_reemplazo.nombre,
+            r.rol,
+            f"{r.partido.equipo_local} vs {r.partido.equipo_visitante}",
+            r.partido.fecha_hora.strftime("%d.%m.%Y %H:%M") if r.partido.fecha_hora else "",
+            r.partido.estadio or "",
+            r.partido.ciudad or "",
+            r.partido.competicion or "",
+        ])
+    for col in ws2.columns:
+        max_len = max((len(str(cell.value or "")) for cell in col), default=10)
+        ws2.column_dimensions[col[0].column_letter].width = min(max_len + 4, 40)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=conflictos_arbitros.xlsx"}
+    )
 
 
 # ─── Importar Excel ──────────────────────────────────────────────────────────

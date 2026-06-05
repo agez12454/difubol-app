@@ -84,7 +84,16 @@
 
     <!-- TAB: CONFLICTOS -->
     <section id="tab-conflictos" class="tab hidden">
-      <div class="section-header"><h2><i class="fa-solid fa-triangle-exclamation"></i> Conflictos detectados</h2></div>
+      <div class="section-header">
+        <h2><i class="fa-solid fa-triangle-exclamation"></i> Conflictos detectados</h2>
+        <a href="/api/exportar/excel" class="btn btn-success" download>
+          <i class="fa-solid fa-file-excel"></i> Exportar Excel
+        </a>
+      </div>
+
+      <!-- Reemplazos confirmados -->
+      <div id="reemplazos-confirmados"></div>
+
       <div id="lista-conflictos"></div>
     </section>
 

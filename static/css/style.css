@@ -380,6 +380,17 @@ main { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
   justify-content: space-between;
   gap: 10px;
 }
+.reemplazo-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.reemplazo-item:last-child { border-bottom: none; }
+.reemplazo-nombre { font-weight: 700; color: var(--text); }
+
 .sugerencia-item .nombre { font-weight: 600; }
 .sugerencia-item .cat { font-size: 0.8rem; color: var(--text2); }
 .sugerencia-item.aviso-dia { border-color: rgba(245,166,35,0.4); }
