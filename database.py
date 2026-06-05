@@ -1,0 +1,65 @@
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, ForeignKey, Boolean, Text
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, relationship
+from datetime import datetime
+
+SQLALCHEMY_DATABASE_URL = "sqlite:///./arbitros.db"
+
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+
+class Arbitro(Base):
+    __tablename__ = "arbitros"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String, nullable=False)
+    categoria = Column(String, nullable=False)  # Ej: ANTIOQUIA AAA
+    activo = Column(Boolean, default=True)
+    creado_en = Column(DateTime, default=datetime.utcnow)
+
+    asignaciones = relationship("AsignacionPartido", back_populates="arbitro")
+
+
+class Partido(Base):
+    __tablename__ = "partidos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    numero = Column(String, unique=True, index=True)
+    equipo_local = Column(String)
+    equipo_visitante = Column(String)
+    competicion = Column(String)
+    fecha_jornada = Column(String)
+    estadio = Column(String)
+    fecha_hora = Column(DateTime)
+    numero_partido = Column(String)
+    departamento = Column(String)
+    ciudad = Column(String)
+    creado_en = Column(DateTime, default=datetime.utcnow)
+
+    asignaciones = relationship("AsignacionPartido", back_populates="partido", cascade="all, delete-orphan")
+
+
+class AsignacionPartido(Base):
+    __tablename__ = "asignaciones"
+
+    id = Column(Integer, primary_key=True, index=True)
+    partido_id = Column(Integer, ForeignKey("partidos.id"))
+    arbitro_id = Column(Integer, ForeignKey("arbitros.id"))
+    rol = Column(String)  # Árbitro, 1° árbitro asistente, 2° árbitro asistente, Cuarto árbitro, etc.
+
+    partido = relationship("Partido", back_populates="asignaciones")
+    arbitro = relationship("Arbitro", back_populates="asignaciones")
+
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+def init_db():
+    Base.metadata.create_all(bind=engine)

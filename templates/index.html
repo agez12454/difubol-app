@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestor de Árbitros</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <div class="logo"><i class="fa-solid fa-whistle"></i> Gestor de Árbitros</div>
+      <nav>
+        <button class="nav-btn active" data-tab="partidos"><i class="fa-solid fa-calendar-days"></i> Partidos</button>
+        <button class="nav-btn" data-tab="conflictos"><i class="fa-solid fa-triangle-exclamation"></i> Conflictos <span id="badge-conflictos" class="badge hidden">0</span></button>
+        <button class="nav-btn" data-tab="arbitros"><i class="fa-solid fa-user-tie"></i> Árbitros</button>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <!-- TAB: PARTIDOS -->
+    <section id="tab-partidos" class="tab active">
+      <div class="section-header">
+        <h2>Partidos</h2>
+        <button class="btn btn-primary" id="btn-subir-imagen">
+          <i class="fa-solid fa-image"></i> Subir imagen
+        </button>
+      </div>
+
+      <!-- Upload zone -->
+      <div id="upload-area" class="upload-area hidden">
+        <div class="upload-box" id="drop-zone">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+          <p>Arrastra la imagen aquí o haz clic para seleccionar</p>
+          <input type="file" id="file-input" accept="image/*" hidden />
+        </div>
+      </div>
+
+      <!-- Formulario de partido con imagen al lado -->
+      <div id="form-partido" class="card hidden">
+        <h3 id="form-titulo">Datos del partido</h3>
+        <div class="form-con-imagen">
+          <!-- Imagen de referencia -->
+          <div id="imagen-referencia" class="imagen-ref hidden">
+            <div class="imagen-ref-header">
+              <span><i class="fa-solid fa-image"></i> Imagen de referencia</span>
+              <button class="btn-close" id="btn-ocultar-img" title="Ocultar imagen"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <img id="preview-img" src="" alt="Imagen del partido" />
+            <div style="padding:12px">
+              <button class="btn btn-primary" id="btn-procesar" style="width:100%">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Extraer datos con IA
+              </button>
+              <div id="upload-loading" class="loading hidden" style="margin-top:10px">
+                <div class="spinner"></div><span>La IA está leyendo la imagen...</span>
+              </div>
+            </div>
+          </div>
+          <!-- Formulario -->
+          <div class="form-campos">
+            <div class="form-grid">
+              <div class="field"><label>Equipo local</label><input id="f-local" type="text" /></div>
+              <div class="field"><label>Equipo visitante</label><input id="f-visitante" type="text" /></div>
+              <div class="field"><label>Competición</label><input id="f-competicion" type="text" /></div>
+              <div class="field"><label>Estadio</label><input id="f-estadio" type="text" /></div>
+              <div class="field"><label>Fecha/Hora (DD.MM.YYYY HH:MM)</label><input id="f-fechahora" type="text" /></div>
+              <div class="field"><label>Ciudad</label><input id="f-ciudad" type="text" /></div>
+            </div>
+            <h4><i class="fa-solid fa-users"></i> Oficiales del partido</h4>
+            <div id="asignaciones-form"></div>
+            <div class="form-actions">
+              <button class="btn btn-success" id="btn-guardar-partido"><i class="fa-solid fa-floppy-disk"></i> Guardar partido</button>
+              <button class="btn btn-ghost" id="btn-cancelar-form">Cancelar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lista de partidos -->
+      <div id="lista-partidos" class="partidos-grid"></div>
+    </section>
+
+    <!-- TAB: CONFLICTOS -->
+    <section id="tab-conflictos" class="tab hidden">
+      <div class="section-header"><h2><i class="fa-solid fa-triangle-exclamation"></i> Conflictos detectados</h2></div>
+      <div id="lista-conflictos"></div>
+    </section>
+
+    <!-- TAB: ÁRBITROS -->
+    <section id="tab-arbitros" class="tab hidden">
+      <div class="section-header">
+        <h2>Registro de árbitros</h2>
+      </div>
+      <div class="card">
+        <h3>Agregar árbitro</h3>
+        <div class="form-row">
+          <div class="field"><label>Nombre (como aparece en el sistema)</label><input id="arb-nombre" type="text" placeholder="APELLIDO NOMBRE" /></div>
+          <div class="field"><label>Categoría</label><input id="arb-categoria" type="text" placeholder="ANTIOQUIA AAA" /></div>
+          <button class="btn btn-primary" id="btn-agregar-arbitro"><i class="fa-solid fa-plus"></i> Agregar</button>
+        </div>
+      </div>
+      <div id="lista-arbitros" class="arbitros-list"></div>
+    </section>
+  </main>
+
+  <!-- Modal de sugerencias -->
+  <div id="modal-sugerencias" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-shuffle"></i> Sugerencias de reemplazo</h3>
+        <button class="btn-close" id="cerrar-modal"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
