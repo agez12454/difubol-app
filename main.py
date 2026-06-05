@@ -319,7 +319,16 @@ def listar_partidos(jornada_id: Optional[int] = None, db: Session = Depends(get_
     partidos = q.order_by(Partido.fecha_hora).all()
     result = []
     for p in partidos:
-        conflictos = detectar_conflictos(p.id, db)
+        conflictos_raw = detectar_conflictos(p.id, db)
+        # Filtrar conflictos que ya tienen reemplazo asignado
+        conflictos = []
+        for c in conflictos_raw:
+            reemplazo = db.query(Reemplazo).filter(
+                Reemplazo.arbitro_original_id == c["arbitro_id"],
+                Reemplazo.partido_id.in_([p.id, c["partido_conflicto_id"]])
+            ).first()
+            if not reemplazo:
+                conflictos.append(c)
         result.append(
             {
                 "id": p.id,
