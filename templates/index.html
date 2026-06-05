@@ -91,16 +91,31 @@
     <!-- TAB: ÁRBITROS -->
     <section id="tab-arbitros" class="tab hidden">
       <div class="section-header">
-        <h2>Registro de árbitros</h2>
+        <h2>Árbitros</h2>
+        <div style="display:flex;gap:8px">
+          <label class="btn btn-ghost" style="cursor:pointer">
+            <i class="fa-solid fa-file-excel"></i> Importar Excel
+            <input type="file" id="excel-input" accept=".xlsx,.xls" hidden />
+          </label>
+        </div>
       </div>
+
+      <!-- Panel importar Excel -->
+      <div id="excel-panel" class="card hidden">
+        <h3><i class="fa-solid fa-file-excel"></i> Importar desde Excel</h3>
+        <div id="excel-preview"></div>
+      </div>
+
       <div class="card">
-        <h3>Agregar árbitro</h3>
+        <h3>Agregar árbitro manualmente</h3>
         <div class="form-row">
           <div class="field"><label>Apellidos</label><input id="arb-apellidos" type="text" placeholder="APELLIDOS COMO APARECE EN EL COMET" /></div>
           <div class="field"><label>Nombres</label><input id="arb-nombres" type="text" placeholder="NOMBRES COMO APARECE EN EL COMET" /></div>
           <button class="btn btn-primary" id="btn-agregar-arbitro"><i class="fa-solid fa-plus"></i> Agregar</button>
         </div>
       </div>
+
+      <!-- Ranking -->
       <div id="lista-arbitros" class="arbitros-list"></div>
     </section>
   </main>

@@ -362,14 +362,100 @@ async function cargarArbitros() {
     return;
   }
 
-  cont.innerHTML = arbitros.map(a => `
-    <div class="arbitro-item">
-      <div class="arbitro-info">
-        <span class="arbitro-nombre">${a.nombre}</span>
-        </div>
-      <button class="btn btn-sm btn-danger" onclick="eliminarArbitro(${a.id})"><i class="fa-solid fa-trash"></i></button>
-    </div>
-  `).join('');
+  cont.innerHTML = `
+    <div class="card" style="padding:0;overflow:hidden">
+      <table class="ranking-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Árbitro</th>
+            <th>Central</th>
+            <th>1° Asist.</th>
+            <th>2° Asist.</th>
+            <th>4° Árb.</th>
+            <th>Total</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${arbitros.map((a, i) => `
+            <tr>
+              <td class="rank">${i + 1}</td>
+              <td class="arb-name">${a.nombre}</td>
+              <td class="num">${a.por_rol['Árbitro'] || 0}</td>
+              <td class="num">${a.por_rol['1° árbitro asistente'] || 0}</td>
+              <td class="num">${a.por_rol['2° árbitro asistente'] || 0}</td>
+              <td class="num">${a.por_rol['Cuarto árbitro'] || 0}</td>
+              <td class="num total"><strong>${a.total_partidos}</strong></td>
+              <td><button class="btn btn-sm btn-danger" onclick="eliminarArbitro(${a.id})"><i class="fa-solid fa-trash"></i></button></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// ─── Importar Excel ───────────────────────────────────────────────────────────
+document.getElementById('excel-input').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const panel = document.getElementById('excel-panel');
+  const preview = document.getElementById('excel-preview');
+  panel.classList.remove('hidden');
+  preview.innerHTML = `<div class="loading"><div class="spinner"></div> Leyendo Excel...</div>`;
+
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await api('/api/importar-excel', { method: 'POST', body: fd });
+    window._excelFile = file;
+
+    preview.innerHTML = `
+      <p style="color:var(--text2);margin-bottom:12px">Se encontraron <strong style="color:var(--text)">${res.total_filas} filas</strong>. Columnas detectadas:</p>
+      <div class="columnas-grid">
+        ${res.columnas.map((c, i) => `<div class="col-chip"><span class="col-num">${i}</span> ${c}</div>`).join('')}
+      </div>
+      <p style="color:var(--text2);font-size:0.85rem;margin:14px 0 8px">Indica el número de columna para cada campo (-1 si no existe en tu Excel):</p>
+      <div class="form-grid">
+        <div class="field"><label>Nombre árbitro</label><input type="number" id="xc-nombre" value="0" min="-1"/></div>
+        <div class="field"><label>Rol</label><input type="number" id="xc-rol" value="1" min="-1"/></div>
+        <div class="field"><label>Fecha/Hora</label><input type="number" id="xc-fecha" value="2" min="-1"/></div>
+        <div class="field"><label>Equipo local</label><input type="number" id="xc-local" value="3" min="-1"/></div>
+        <div class="field"><label>Equipo visitante</label><input type="number" id="xc-visitante" value="4" min="-1"/></div>
+        <div class="field"><label>Estadio</label><input type="number" id="xc-estadio" value="-1" min="-1"/></div>
+        <div class="field"><label>Ciudad</label><input type="number" id="xc-ciudad" value="-1" min="-1"/></div>
+      </div>
+      <p style="color:var(--text2);font-size:0.82rem;margin-bottom:12px">Primeras filas de ejemplo:<br><code style="color:var(--primary)">${res.preview.map(r => r.join(' | ')).join('<br>')}</code></p>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-success" onclick="confirmarExcel()"><i class="fa-solid fa-file-import"></i> Importar datos</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('excel-panel').classList.add('hidden')">Cancelar</button>
+      </div>`;
+  } catch (e) {
+    preview.innerHTML = `<p style="color:var(--danger)">Error: ${e.message}</p>`;
+  }
+});
+
+async function confirmarExcel() {
+  if (!window._excelFile) return;
+  const fd = new FormData();
+  fd.append('file', window._excelFile);
+  const params = new URLSearchParams({
+    col_nombre: document.getElementById('xc-nombre').value,
+    col_rol: document.getElementById('xc-rol').value,
+    col_fecha: document.getElementById('xc-fecha').value,
+    col_local: document.getElementById('xc-local').value,
+    col_visitante: document.getElementById('xc-visitante').value,
+    col_estadio: document.getElementById('xc-estadio').value,
+    col_ciudad: document.getElementById('xc-ciudad').value,
+  });
+  try {
+    const res = await api(`/api/importar-excel/confirmar?${params}`, { method: 'POST', body: fd });
+    toast(`✓ Importado: ${res.arbitros_creados} árbitros y ${res.partidos_creados} partidos nuevos`);
+    document.getElementById('excel-panel').classList.add('hidden');
+    cargarArbitros();
+  } catch (e) {
+    toast(`Error: ${e.message}`, 'error');
+  }
 }
 
 document.getElementById('btn-agregar-arbitro').addEventListener('click', async () => {

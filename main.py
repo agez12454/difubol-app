@@ -224,7 +224,24 @@ def listar_modelos():
 
 @app.get("/api/arbitros")
 def listar_arbitros(db: Session = Depends(get_db)):
-    return db.query(Arbitro).filter(Arbitro.activo == True).order_by(Arbitro.nombre).all()
+    arbitros = db.query(Arbitro).filter(Arbitro.activo == True).order_by(Arbitro.nombre).all()
+    result = []
+    for a in arbitros:
+        conteo = {}
+        total = 0
+        for asig in a.asignaciones:
+            rol = asig.rol
+            conteo[rol] = conteo.get(rol, 0) + 1
+            total += 1
+        result.append({
+            "id": a.id,
+            "nombre": a.nombre,
+            "total_partidos": total,
+            "por_rol": conteo,
+        })
+    # Ordenar por total de partidos descendente
+    result.sort(key=lambda x: x["total_partidos"], reverse=True)
+    return result
 
 
 @app.post("/api/arbitros")
@@ -405,3 +422,107 @@ def todos_los_conflictos(db: Session = Depends(get_db)):
 @app.get("/api/sugerencias/{arbitro_id}/{partido_id}")
 def sugerencias(arbitro_id: int, partido_id: int, db: Session = Depends(get_db)):
     return sugerir_reemplazos(arbitro_id, partido_id, db)
+
+
+# ─── Importar Excel ──────────────────────────────────────────────────────────
+
+@app.post("/api/importar-excel")
+async def importar_excel(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    """
+    Lee un Excel con columnas: NOMBRE, PARTIDO (o similar) y las variantes de rol.
+    Formato esperado: columna ÁRBITRO con el nombre, columna ROL, columna FECHA, EQUIPO_LOCAL, EQUIPO_VISITANTE.
+    Retorna preview de las columnas para que el usuario confirme el mapeo.
+    """
+    import openpyxl, io
+    contenido = await file.read()
+    wb = openpyxl.load_workbook(io.BytesIO(contenido), data_only=True)
+    ws = wb.active
+
+    headers = [str(cell.value).strip() if cell.value else "" for cell in ws[1]]
+    filas = []
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        if any(v for v in row):
+            filas.append([str(v).strip() if v is not None else "" for v in row])
+
+    return {
+        "columnas": headers,
+        "total_filas": len(filas),
+        "preview": filas[:3],  # Muestra las primeras 3 filas como ejemplo
+    }
+
+
+@app.post("/api/importar-excel/confirmar")
+async def confirmar_importacion(
+    file: UploadFile = File(...),
+    col_nombre: int = 0,       # índice columna nombre árbitro
+    col_rol: int = 1,          # índice columna rol
+    col_fecha: int = 2,        # índice columna fecha
+    col_local: int = 3,        # índice columna equipo local
+    col_visitante: int = 4,    # índice columna equipo visitante
+    col_estadio: int = -1,     # -1 = no existe
+    col_ciudad: int = -1,
+    db: Session = Depends(get_db)
+):
+    import openpyxl, io
+    contenido = await file.read()
+    wb = openpyxl.load_workbook(io.BytesIO(contenido), data_only=True)
+    ws = wb.active
+
+    arbitros_creados = 0
+    partidos_creados = 0
+    errores = []
+
+    def get_col(row, idx):
+        try:
+            return str(row[idx]).strip() if idx >= 0 and idx < len(row) else ""
+        except:
+            return ""
+
+    for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        row = [str(v).strip() if v is not None else "" for v in row]
+        nombre = get_col(row, col_nombre).upper()
+        rol = get_col(row, col_rol)
+        fecha_str = get_col(row, col_fecha)
+        local = get_col(row, col_local).upper()
+        visitante = get_col(row, col_visitante).upper()
+        estadio = get_col(row, col_estadio)
+        ciudad = get_col(row, col_ciudad)
+
+        if not nombre or not local:
+            continue
+
+        # Crear o buscar árbitro
+        arbitro = db.query(Arbitro).filter(Arbitro.nombre == nombre).first()
+        if not arbitro:
+            arbitro = Arbitro(nombre=nombre, categoria="")
+            db.add(arbitro)
+            db.flush()
+            arbitros_creados += 1
+
+        # Crear o buscar partido
+        numero = f"XLS-{local[:3]}-{visitante[:3]}-{fecha_str}".replace(" ", "")
+        partido = db.query(Partido).filter(Partido.numero == numero).first()
+        if not partido:
+            partido = Partido(
+                numero=numero,
+                equipo_local=local,
+                equipo_visitante=visitante,
+                competicion="",
+                estadio=estadio,
+                ciudad=ciudad,
+                fecha_hora=parse_fecha(fecha_str),
+            )
+            db.add(partido)
+            db.flush()
+            partidos_creados += 1
+
+        # Crear asignación si no existe
+        existe = db.query(AsignacionPartido).filter(
+            AsignacionPartido.partido_id == partido.id,
+            AsignacionPartido.arbitro_id == arbitro.id,
+        ).first()
+        if not existe:
+            db.add(AsignacionPartido(partido_id=partido.id, arbitro_id=arbitro.id, rol=rol or "Árbitro"))
+
+    db.commit()
+    return {"arbitros_creados": arbitros_creados, "partidos_creados": partidos_creados}
