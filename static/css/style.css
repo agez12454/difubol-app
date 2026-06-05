@@ -382,6 +382,8 @@ main { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
 }
 .sugerencia-item .nombre { font-weight: 600; }
 .sugerencia-item .cat { font-size: 0.8rem; color: var(--text2); }
+.sugerencia-item.aviso-dia { border-color: rgba(245,166,35,0.4); }
+.aviso-dia-tag { font-size: 0.78rem; color: var(--warning); margin-top: 3px; display:flex; align-items:center; gap:5px; }
 .no-sugerencias { color: var(--text2); text-align: center; padding: 24px; }
 
 /* ─── Toast ───────────────────────────────────── */

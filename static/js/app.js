@@ -335,10 +335,10 @@ async function verSugerencias(arbitroId, partidoId, nombre) {
           Árbitros disponibles para reemplazar a <strong style="color:var(--text)">${nombre}</strong>:
         </p>
         ${sugerencias.map(s => `
-          <div class="sugerencia-item">
+          <div class="sugerencia-item ${s.aviso_mismo_dia ? 'aviso-dia' : ''}">
             <div>
               <div class="nombre">${s.nombre}</div>
-              <div class="cat">${s.categoria}</div>
+              ${s.aviso_mismo_dia ? `<div class="aviso-dia-tag"><i class="fa-solid fa-circle-exclamation"></i> Tiene otro partido ese día</div>` : ''}
             </div>
             <i class="fa-solid fa-circle-check" style="color:var(--success)"></i>
           </div>
