@@ -236,7 +236,6 @@ async function cargarPartidos() {
           return `<div class="oficial-item">
             <span class="rol">${a.rol}:</span>
             <span class="nombre">${a.nombre}</span>
-            <span style="font-size:0.75rem;color:var(--text2)">(${a.categoria})</span>
             ${tieneConflicto ? `<span class="conflicto-tag" onclick="verSugerencias(${a.arbitro_id},${p.id},'${a.nombre}')">⚠ Ver reemplazos</span>` : ''}
           </div>`;
         }).join('')}
@@ -367,8 +366,7 @@ async function cargarArbitros() {
     <div class="arbitro-item">
       <div class="arbitro-info">
         <span class="arbitro-nombre">${a.nombre}</span>
-        <span class="arbitro-cat"><i class="fa-solid fa-location-dot" style="font-size:0.7rem"></i> ${a.categoria}</span>
-      </div>
+        </div>
       <button class="btn btn-sm btn-danger" onclick="eliminarArbitro(${a.id})"><i class="fa-solid fa-trash"></i></button>
     </div>
   `).join('');
@@ -376,17 +374,15 @@ async function cargarArbitros() {
 
 document.getElementById('btn-agregar-arbitro').addEventListener('click', async () => {
   const nombre = document.getElementById('arb-nombre').value.trim();
-  const categoria = document.getElementById('arb-categoria').value.trim();
-  if (!nombre || !categoria) { toast('Nombre y categoría son obligatorios', 'error'); return; }
+  if (!nombre) { toast('El nombre es obligatorio', 'error'); return; }
 
   try {
     await api('/api/arbitros', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre, categoria }),
+      body: JSON.stringify({ nombre, categoria: '' }),
     });
     document.getElementById('arb-nombre').value = '';
-    document.getElementById('arb-categoria').value = '';
     toast('Árbitro registrado ✓');
     cargarArbitros();
   } catch (e) {
