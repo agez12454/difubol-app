@@ -22,11 +22,22 @@ class Arbitro(Base):
     asignaciones = relationship("AsignacionPartido", back_populates="arbitro")
 
 
+class Jornada(Base):
+    __tablename__ = "jornadas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String, nullable=False)  # "Jornada 11"
+    creado_en = Column(DateTime, default=datetime.utcnow)
+
+    partidos = relationship("Partido", back_populates="jornada")
+
+
 class Partido(Base):
     __tablename__ = "partidos"
 
     id = Column(Integer, primary_key=True, index=True)
     numero = Column(String, unique=True, index=True)
+    jornada_id = Column(Integer, ForeignKey("jornadas.id"), nullable=True)
     equipo_local = Column(String)
     equipo_visitante = Column(String)
     competicion = Column(String)
@@ -38,6 +49,7 @@ class Partido(Base):
     ciudad = Column(String)
     creado_en = Column(DateTime, default=datetime.utcnow)
 
+    jornada = relationship("Jornada", back_populates="partidos")
     asignaciones = relationship("AsignacionPartido", back_populates="partido", cascade="all, delete-orphan")
 
 

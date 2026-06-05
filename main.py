@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 import httpx
 
-from database import get_db, init_db, Arbitro, Partido, AsignacionPartido, Reemplazo  # noqa: E402
+from database import get_db, init_db, Arbitro, Partido, AsignacionPartido, Reemplazo, Jornada  # noqa: E402
 
 load_dotenv()
 init_db()
@@ -228,6 +228,37 @@ async def index():
     return FileResponse("templates/index.html")
 
 
+# ─── API Jornadas ─────────────────────────────────────────────────────────────
+
+class JornadaCreate(BaseModel):
+    nombre: str
+
+
+@app.get("/api/jornadas")
+def listar_jornadas(db: Session = Depends(get_db)):
+    return [{"id": j.id, "nombre": j.nombre, "total_partidos": len(j.partidos)}
+            for j in db.query(Jornada).order_by(Jornada.creado_en.desc()).all()]
+
+
+@app.post("/api/jornadas")
+def crear_jornada(data: JornadaCreate, db: Session = Depends(get_db)):
+    j = Jornada(nombre=data.nombre.strip())
+    db.add(j)
+    db.commit()
+    db.refresh(j)
+    return {"id": j.id, "nombre": j.nombre}
+
+
+@app.delete("/api/jornadas/{jornada_id}")
+def eliminar_jornada(jornada_id: int, db: Session = Depends(get_db)):
+    j = db.query(Jornada).filter(Jornada.id == jornada_id).first()
+    if not j:
+        raise HTTPException(status_code=404, detail="Jornada no encontrada")
+    db.delete(j)
+    db.commit()
+    return {"ok": True}
+
+
 # ─── API Árbitros ────────────────────────────────────────────────────────────
 
 @app.get("/api/debug-key")
@@ -286,8 +317,11 @@ def eliminar_arbitro(arbitro_id: int, db: Session = Depends(get_db)):
 # ─── API Partidos ─────────────────────────────────────────────────────────────
 
 @app.get("/api/partidos")
-def listar_partidos(db: Session = Depends(get_db)):
-    partidos = db.query(Partido).order_by(Partido.fecha_hora).all()
+def listar_partidos(jornada_id: Optional[int] = None, db: Session = Depends(get_db)):
+    q = db.query(Partido)
+    if jornada_id:
+        q = q.filter(Partido.jornada_id == jornada_id)
+    partidos = q.order_by(Partido.fecha_hora).all()
     result = []
     for p in partidos:
         conflictos = detectar_conflictos(p.id, db)
@@ -340,7 +374,7 @@ def obtener_partido(partido_id: int, db: Session = Depends(get_db)):
 
 
 @app.post("/api/partidos")
-def guardar_partido(data: PartidoManual, db: Session = Depends(get_db)):
+def guardar_partido(data: PartidoManual, jornada_id: Optional[int] = None, db: Session = Depends(get_db)):
     # Verificar si ya existe
     existente = db.query(Partido).filter(Partido.numero == data.numero).first()
     if existente:
@@ -359,6 +393,7 @@ def guardar_partido(data: PartidoManual, db: Session = Depends(get_db)):
     else:
         partido = Partido(
             numero=data.numero,
+            jornada_id=jornada_id,
             equipo_local=data.equipo_local,
             equipo_visitante=data.equipo_visitante,
             competicion=data.competicion,
@@ -422,8 +457,11 @@ async def procesar_imagen(file: UploadFile = File(...)):
 # ─── API Conflictos y Sugerencias ────────────────────────────────────────────
 
 @app.get("/api/conflictos")
-def todos_los_conflictos(db: Session = Depends(get_db)):
-    partidos = db.query(Partido).all()
+def todos_los_conflictos(jornada_id: Optional[int] = None, db: Session = Depends(get_db)):
+    q = db.query(Partido)
+    if jornada_id:
+        q = q.filter(Partido.jornada_id == jornada_id)
+    partidos = q.all()
     todos = []
     vistos = set()
     for p in partidos:

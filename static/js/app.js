@@ -8,6 +8,42 @@ const ROLES = [
 
 let selectedFile = null;
 let partidoEditandoId = null;
+let jornadaActual = null; // ID de la jornada seleccionada
+
+
+// ─── Jornadas ─────────────────────────────────────────────────────────────────
+async function cargarJornadas() {
+  const jornadas = await api('/api/jornadas');
+  const sel = document.getElementById('select-jornada');
+  const valorAnterior = sel.value;
+  sel.innerHTML = '<option value="">— Todas las jornadas —</option>' +
+    jornadas.map(j => `<option value="${j.id}">${j.nombre} (${j.total_partidos} partidos)</option>`).join('');
+  if (valorAnterior) sel.value = valorAnterior;
+  jornadaActual = sel.value ? parseInt(sel.value) : null;
+}
+
+document.getElementById('select-jornada').addEventListener('change', (e) => {
+  jornadaActual = e.target.value ? parseInt(e.target.value) : null;
+  cargarPartidos();
+  cargarConflictos();
+});
+
+document.getElementById('btn-nueva-jornada').addEventListener('click', async () => {
+  const nombre = prompt('Nombre de la jornada (ej: Jornada 12):');
+  if (!nombre || !nombre.trim()) return;
+  const j = await api('/api/jornadas', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nombre: nombre.trim() }),
+  });
+  await cargarJornadas();
+  // Seleccionar la nueva jornada automáticamente
+  document.getElementById('select-jornada').value = j.id;
+  jornadaActual = j.id;
+  cargarPartidos();
+  cargarConflictos();
+  toast(`✓ Jornada "${nombre.trim()}" creada`);
+});
 
 // ─── Utilidades ───────────────────────────────────────────────────────────────
 function toast(msg, type = 'success') {
@@ -169,9 +205,11 @@ document.getElementById('btn-cancelar-form').addEventListener('click', () => {
 document.getElementById('btn-guardar-partido').addEventListener('click', async () => {
   const datos = leerFormulario();
   if (!datos.equipo_local || !datos.equipo_visitante) { toast('Los equipos son obligatorios', 'error'); return; }
+  if (!jornadaActual) { toast('Selecciona o crea una jornada primero', 'error'); return; }
 
   try {
-    const res = await api('/api/partidos', {
+    const urlGuardar = jornadaActual ? `/api/partidos?jornada_id=${jornadaActual}` : '/api/partidos';
+    const res = await api(urlGuardar, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(datos),
@@ -192,7 +230,8 @@ document.getElementById('btn-guardar-partido').addEventListener('click', async (
 
 // ─── Lista de partidos ────────────────────────────────────────────────────────
 async function cargarPartidos() {
-  const partidos = await api('/api/partidos');
+  const url = jornadaActual ? `/api/partidos?jornada_id=${jornadaActual}` : '/api/partidos';
+  const partidos = await api(url);
   const cont = document.getElementById('lista-partidos');
 
   // Actualizar badge
@@ -283,7 +322,8 @@ async function eliminarPartido(id) {
 // ─── Conflictos ───────────────────────────────────────────────────────────────
 async function cargarConflictos() {
   cargarReemplazos();
-  const conflictos = await api('/api/conflictos');
+  const url = jornadaActual ? `/api/conflictos?jornada_id=${jornadaActual}` : '/api/conflictos';
+  const conflictos = await api(url);
   const cont = document.getElementById('lista-conflictos');
 
   if (conflictos.length === 0) {
@@ -574,4 +614,5 @@ async function eliminarArbitro(id) {
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
+cargarJornadas();
 cargarPartidos();

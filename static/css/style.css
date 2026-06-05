@@ -49,6 +49,19 @@ header {
   gap: 8px;
 }
 nav { display: flex; gap: 6px; }
+.jornada-selector { display: flex; align-items: center; gap: 8px; }
+.jornada-selector select {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  outline: none;
+  cursor: pointer;
+  min-width: 160px;
+}
+.jornada-selector select:focus { border-color: var(--primary); }
 .nav-btn {
   background: none;
   border: 1px solid transparent;
