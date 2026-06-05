@@ -309,10 +309,16 @@ async function cargarConflictos() {
         ${c.estadio_conflicto ? `&nbsp;·&nbsp;<i class="fa-solid fa-location-dot" style="color:var(--primary);font-size:0.75rem"></i> ${c.estadio_conflicto}` : ''}
         ${c.ciudad_conflicto ? `, ${c.ciudad_conflicto}` : ''}
       </div>
-      <div style="margin-top:12px">
-        <button class="btn btn-sm btn-ghost" onclick="verSugerencias(${c.arbitro_id},${c.partido_origen_id},'${c.arbitro_nombre}')">
-          <i class="fa-solid fa-shuffle"></i> Ver árbitros disponibles para reemplazar
-        </button>
+      <div style="margin-top:14px">
+        <p style="font-size:0.8rem;color:var(--text2);margin-bottom:8px"><i class="fa-solid fa-hand-pointer"></i> ¿En cuál partido necesita reemplazo?</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-sm btn-ghost" onclick="verSugerencias(${c.arbitro_id},${c.partido_origen_id},'${c.arbitro_nombre}')">
+            <i class="fa-solid fa-shuffle"></i> Partido 1: ${c.equipos_origen} (${c.fecha_origen})
+          </button>
+          <button class="btn btn-sm btn-ghost" onclick="verSugerencias(${c.arbitro_id},${c.partido_conflicto_id},'${c.arbitro_nombre}')">
+            <i class="fa-solid fa-shuffle"></i> Partido 2: ${c.equipos_conflicto} (${c.fecha_conflicto})
+          </button>
+        </div>
       </div>
     </div>
   `).join('');
