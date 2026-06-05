@@ -495,8 +495,11 @@ class ReemplazoCreate(BaseModel):
 
 
 @app.get("/api/reemplazos")
-def listar_reemplazos(db: Session = Depends(get_db)):
-    reemplazos = db.query(Reemplazo).order_by(Reemplazo.creado_en.desc()).all()
+def listar_reemplazos(jornada_id: Optional[int] = None, db: Session = Depends(get_db)):
+    q = db.query(Reemplazo)
+    if jornada_id:
+        q = q.join(Partido).filter(Partido.jornada_id == jornada_id)
+    reemplazos = q.order_by(Reemplazo.creado_en.desc()).all()
     return [{
         "id": r.id,
         "partido_id": r.partido_id,

@@ -432,7 +432,8 @@ async function asignarReemplazo(reemplazoId, reemplazoNombre) {
 }
 
 async function cargarReemplazos() {
-  const reemplazos = await api('/api/reemplazos');
+  const url = jornadaActual ? `/api/reemplazos?jornada_id=${jornadaActual}` : '/api/reemplazos';
+  const reemplazos = await api(url);
   const cont = document.getElementById('reemplazos-confirmados');
   if (reemplazos.length === 0) { cont.innerHTML = ''; return; }
 
