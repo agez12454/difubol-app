@@ -274,7 +274,8 @@ async function cargarPartidos() {
           const tieneConflicto = conflictoArbitros.includes(a.arbitro_id);
           return `<div class="oficial-item">
             <span class="rol">${a.rol}:</span>
-            <span class="nombre">${a.nombre}</span>
+            <span class="nombre ${a.reemplazo ? 'nombre-reemplazado' : ''}">${a.nombre}</span>
+            ${a.reemplazo ? `<span class="reemplazo-inline"><i class="fa-solid fa-arrow-right-arrow-left"></i> ${a.reemplazo}</span>` : ''}
             ${tieneConflicto ? `<span class="conflicto-tag" onclick="verSugerencias(${a.arbitro_id},${p.id},'${a.nombre}')">⚠ Ver reemplazos</span>` : ''}
           </div>`;
         }).join('')}

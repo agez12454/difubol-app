@@ -340,7 +340,18 @@ def listar_partidos(jornada_id: Optional[int] = None, db: Session = Depends(get_
                 "fecha_hora": p.fecha_hora.strftime("%d.%m.%Y %H:%M") if p.fecha_hora else "",
                 "ciudad": p.ciudad,
                 "asignaciones": [
-                    {"rol": a.rol, "nombre": a.arbitro.nombre, "categoria": a.arbitro.categoria, "arbitro_id": a.arbitro_id}
+                    {
+                        "rol": a.rol,
+                        "nombre": a.arbitro.nombre,
+                        "categoria": a.arbitro.categoria,
+                        "arbitro_id": a.arbitro_id,
+                        "reemplazo": (lambda r: r.arbitro_reemplazo.nombre if r else None)(
+                            db.query(Reemplazo).filter(
+                                Reemplazo.arbitro_original_id == a.arbitro_id,
+                                Reemplazo.partido_id == p.id
+                            ).first()
+                        ),
+                    }
                     for a in p.asignaciones
                 ],
                 "conflictos": conflictos,
