@@ -476,6 +476,14 @@ def todos_los_conflictos(jornada_id: Optional[int] = None, db: Session = Depends
                 c["estadio_origen"] = p.estadio or ""
                 c["ciudad_origen"] = p.ciudad or ""
                 c["competicion_origen"] = p.competicion or ""
+                # Verificar si ya tiene reemplazo asignado
+                reemplazo = db.query(Reemplazo).filter(
+                    Reemplazo.arbitro_original_id == c["arbitro_id"],
+                    Reemplazo.partido_id.in_([p.id, c["partido_conflicto_id"]])
+                ).first()
+                c["resuelto"] = reemplazo is not None
+                c["reemplazo_nombre"] = reemplazo.arbitro_reemplazo.nombre if reemplazo else None
+                c["reemplazo_partido_id"] = reemplazo.partido_id if reemplazo else None
                 todos.append(c)
     return todos
 
@@ -496,10 +504,9 @@ class ReemplazoCreate(BaseModel):
 
 @app.get("/api/reemplazos")
 def listar_reemplazos(jornada_id: Optional[int] = None, db: Session = Depends(get_db)):
-    q = db.query(Reemplazo)
+    reemplazos = db.query(Reemplazo).order_by(Reemplazo.creado_en.desc()).all()
     if jornada_id:
-        q = q.join(Partido).filter(Partido.jornada_id == jornada_id)
-    reemplazos = q.order_by(Reemplazo.creado_en.desc()).all()
+        reemplazos = [r for r in reemplazos if r.partido.jornada_id == jornada_id]
     return [{
         "id": r.id,
         "partido_id": r.partido_id,

@@ -325,13 +325,41 @@ async function cargarConflictos() {
   const url = jornadaActual ? `/api/conflictos?jornada_id=${jornadaActual}` : '/api/conflictos';
   const conflictos = await api(url);
   const cont = document.getElementById('lista-conflictos');
+  const contResueltos = document.getElementById('conflictos-resueltos');
 
-  if (conflictos.length === 0) {
+  const pendientes = conflictos.filter(c => !c.resuelto);
+  const resueltos = conflictos.filter(c => c.resuelto);
+
+  // ── Resueltos ──
+  if (resueltos.length > 0) {
+    contResueltos.innerHTML = `
+      <div class="card" style="border-color:rgba(46,204,113,0.3);margin-bottom:16px">
+        <h3 style="color:var(--success);margin-bottom:14px"><i class="fa-solid fa-circle-check"></i> Conflictos resueltos (${resueltos.length})</h3>
+        ${resueltos.map(c => `
+          <div class="reemplazo-item">
+            <div>
+              <span class="reemplazo-nombre">${c.reemplazo_nombre}</span>
+              <span style="color:var(--text2)"> reemplaza a </span>
+              <span class="reemplazo-nombre">${c.arbitro_nombre}</span>
+              <div style="font-size:0.8rem;color:var(--text2);margin-top:3px">
+                ${c.reemplazo_partido_id === c.partido_origen_id
+                  ? `${c.equipos_origen} — ${c.fecha_origen}`
+                  : `${c.equipos_conflicto} — ${c.fecha_conflicto}`}
+              </div>
+            </div>
+          </div>`).join('')}
+      </div>`;
+  } else {
+    contResueltos.innerHTML = '';
+  }
+
+  // ── Pendientes ──
+  if (pendientes.length === 0) {
     cont.innerHTML = `<div class="empty-state"><i class="fa-solid fa-circle-check" style="color:var(--success)"></i><p>No hay conflictos de horario detectados.</p></div>`;
     return;
   }
 
-  cont.innerHTML = conflictos.map(c => `
+  cont.innerHTML = pendientes.map(c => `
     <div class="conflicto-card">
       <div class="conflicto-titulo">
         <i class="fa-solid fa-triangle-exclamation"></i>
