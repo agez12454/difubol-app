@@ -117,10 +117,10 @@ def sugerir_reemplazos(arbitro_id: int, partido_id: int, db: Session):
 
     fin_partido = partido.fecha_hora + timedelta(hours=MATCH_DURATION_HOURS)
 
-    # Árbitros de la misma categoría y activos
+    # Todos los árbitros activos excepto el que tiene conflicto
     candidatos = (
         db.query(Arbitro)
-        .filter(Arbitro.categoria == arbitro.categoria, Arbitro.activo == True, Arbitro.id != arbitro_id)
+        .filter(Arbitro.activo == True, Arbitro.id != arbitro_id)
         .all()
     )
 
