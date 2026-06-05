@@ -135,9 +135,9 @@ def sugerir_reemplazos(arbitro_id: int, partido_id: int, db: Session):
             if not p.fecha_hora:
                 continue
             p_fin = p.fecha_hora + timedelta(hours=MATCH_DURATION_HOURS)
-            mismo_dia = partido.fecha_hora.date() == p.fecha_hora.date()
+            # Solo excluir si los horarios SE SOLAPAN realmente
             solapan = partido.fecha_hora < p_fin and fin_partido > p.fecha_hora
-            if mismo_dia or solapan:
+            if solapan:
                 ocupado = True
                 break
         if not ocupado:
