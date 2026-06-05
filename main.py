@@ -267,11 +267,6 @@ def debug_key():
     return {"tiene_clave": bool(key), "primeros_chars": key[:12] if key else "VACÍA"}
 
 
-@app.get("/api/modelos")
-def listar_modelos():
-    modelos = [m.name for m in gemini.models.list()]
-    return {"modelos": modelos}
-
 
 @app.get("/api/arbitros")
 def listar_arbitros(db: Session = Depends(get_db)):
