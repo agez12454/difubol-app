@@ -277,6 +277,10 @@ async function cargarPartidos() {
             <span class="nombre ${a.reemplazo ? 'nombre-reemplazado' : ''}">${a.nombre}</span>
             ${a.reemplazo ? `<span class="reemplazo-inline"><i class="fa-solid fa-arrow-right-arrow-left"></i> ${a.reemplazo}</span>` : ''}
             ${tieneConflicto ? `<span class="conflicto-tag" onclick="verSugerencias(${a.arbitro_id},${p.id},'${a.nombre}')">⚠ Ver reemplazos</span>` : ''}
+            <button class="btn-confirmar ${a.confirmado ? 'confirmado' : ''}" onclick="toggleConfirmacion(${a.id}, this)" title="${a.confirmado ? 'Confirmado — clic para desmarcar' : 'Marcar como confirmado'}">
+              <i class="fa-solid ${a.confirmado ? 'fa-circle-check' : 'fa-circle'}"></i>
+              ${a.confirmado ? 'Confirmado' : 'Confirmar'}
+            </button>
           </div>`;
         }).join('')}
       </div>
@@ -304,6 +308,17 @@ async function editarPartido(id) {
     document.getElementById('form-titulo').textContent = 'Editar partido';
     document.getElementById('form-partido').classList.remove('hidden');
     document.getElementById('form-partido').scrollIntoView({ behavior: 'smooth' });
+  } catch (e) {
+    toast(`Error: ${e.message}`, 'error');
+  }
+}
+
+async function toggleConfirmacion(asignacionId, btn) {
+  try {
+    const res = await api(`/api/asignaciones/${asignacionId}/confirmar`, { method: 'PATCH' });
+    btn.className = `btn-confirmar ${res.confirmado ? 'confirmado' : ''}`;
+    btn.title = res.confirmado ? 'Confirmado — clic para desmarcar' : 'Marcar como confirmado';
+    btn.innerHTML = `<i class="fa-solid ${res.confirmado ? 'fa-circle-check' : 'fa-circle'}"></i> ${res.confirmado ? 'Confirmado' : 'Confirmar'}`;
   } catch (e) {
     toast(`Error: ${e.message}`, 'error');
   }

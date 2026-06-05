@@ -253,6 +253,22 @@ main { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
 .oficial-item .rol { color: var(--text2); min-width: 180px; }
 .oficial-item .nombre { font-weight: 500; }
 .oficial-item .nombre-reemplazado { text-decoration: line-through; color: var(--text2); font-weight: 400; }
+.btn-confirmar {
+  margin-left: auto;
+  background: none;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 5px;
+  color: var(--text2);
+  font-size: 0.75rem;
+  padding: 2px 9px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s;
+}
+.btn-confirmar:hover { border-color: #2ecc71; color: #2ecc71; }
+.btn-confirmar.confirmado { border-color: #2ecc71; color: #2ecc71; background: rgba(46,204,113,0.1); }
 .reemplazo-inline {
   color: #2ecc71;
   font-weight: 600;

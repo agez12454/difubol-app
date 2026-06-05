@@ -60,6 +60,7 @@ class AsignacionPartido(Base):
     partido_id = Column(Integer, ForeignKey("partidos.id"))
     arbitro_id = Column(Integer, ForeignKey("arbitros.id"))
     rol = Column(String)  # Árbitro, 1° árbitro asistente, 2° árbitro asistente, Cuarto árbitro, etc.
+    confirmado = Column(Boolean, default=False)
 
     partido = relationship("Partido", back_populates="asignaciones")
     arbitro = relationship("Arbitro", back_populates="asignaciones")

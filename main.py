@@ -341,10 +341,12 @@ def listar_partidos(jornada_id: Optional[int] = None, db: Session = Depends(get_
                 "ciudad": p.ciudad,
                 "asignaciones": [
                     {
+                        "id": a.id,
                         "rol": a.rol,
                         "nombre": a.arbitro.nombre,
                         "categoria": a.arbitro.categoria,
                         "arbitro_id": a.arbitro_id,
+                        "confirmado": a.confirmado or False,
                         "reemplazo": (lambda r: r.arbitro_reemplazo.nombre if r else None)(
                             db.query(Reemplazo).filter(
                                 Reemplazo.arbitro_original_id == a.arbitro_id,
@@ -452,6 +454,18 @@ def eliminar_partido(partido_id: int, db: Session = Depends(get_db)):
     db.delete(partido)
     db.commit()
     return {"ok": True}
+
+
+# ─── Confirmaciones ──────────────────────────────────────────────────────────
+
+@app.patch("/api/asignaciones/{asignacion_id}/confirmar")
+def toggle_confirmacion(asignacion_id: int, db: Session = Depends(get_db)):
+    a = db.query(AsignacionPartido).filter(AsignacionPartido.id == asignacion_id).first()
+    if not a:
+        raise HTTPException(status_code=404, detail="Asignación no encontrada")
+    a.confirmado = not (a.confirmado or False)
+    db.commit()
+    return {"id": a.id, "confirmado": a.confirmado}
 
 
 # ─── API Imagen OCR ───────────────────────────────────────────────────────────
