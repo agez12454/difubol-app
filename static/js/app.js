@@ -367,7 +367,7 @@ async function cargarArbitros() {
     <div class="arbitro-item">
       <div class="arbitro-info">
         <span class="arbitro-nombre">${a.nombre}</span>
-        <span class="arbitro-cat">${a.categoria}</span>
+        <span class="arbitro-cat"><i class="fa-solid fa-location-dot" style="font-size:0.7rem"></i> ${a.categoria}</span>
       </div>
       <button class="btn btn-sm btn-danger" onclick="eliminarArbitro(${a.id})"><i class="fa-solid fa-trash"></i></button>
     </div>
