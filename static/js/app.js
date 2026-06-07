@@ -9,6 +9,7 @@ const ROLES = [
 let selectedFile = null;
 let partidoEditandoId = null;
 let jornadaActual = null; // ID de la jornada seleccionada
+let partidosData = []; // Cache para generar mensajes WhatsApp
 
 
 // ─── Jornadas ─────────────────────────────────────────────────────────────────
@@ -228,10 +229,36 @@ document.getElementById('btn-guardar-partido').addEventListener('click', async (
   }
 });
 
+// ─── WhatsApp designación ─────────────────────────────────────────────────────
+function abrirWhatsAppDesignacion(partidoId, asignacionId) {
+  const p = partidosData.find(x => x.id === partidoId);
+  if (!p) return;
+  const a = p.asignaciones.find(x => x.id === asignacionId);
+  if (!a) return;
+  const lugar = [p.estadio, p.ciudad].filter(Boolean).join(', ');
+  const reemplazoInfo = a.reemplazo ? `\n⚠️ *Nota:* Será reemplazado por ${a.reemplazo}` : '';
+  const msg =
+`📋 *DESIGNACIÓN OFICIAL - DIFUTBOL*
+
+⚽ *${p.equipo_local} vs ${p.equipo_visitante}*
+🏆 ${p.competicion || '—'}
+📅 ${p.fecha_hora}
+🏟️ ${lugar || 'Por confirmar'}
+
+Estimado(a) *${a.nombre}*
+Su rol: *${a.rol}*${reemplazoInfo}
+
+Por favor confirme su asistencia respondiendo:
+✅ *CONFIRMO*
+❌ *NO PUEDO*`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
 // ─── Lista de partidos ────────────────────────────────────────────────────────
 async function cargarPartidos() {
   const url = jornadaActual ? `/api/partidos?jornada_id=${jornadaActual}` : '/api/partidos';
   const partidos = await api(url);
+  partidosData = partidos; // cache para WhatsApp
   const cont = document.getElementById('lista-partidos');
 
   // Actualizar badge
@@ -273,14 +300,21 @@ async function cargarPartidos() {
         ${p.asignaciones.map(a => {
           const tieneConflicto = conflictoArbitros.includes(a.arbitro_id);
           return `<div class="oficial-item">
-            <span class="rol">${a.rol}:</span>
-            <span class="nombre ${a.reemplazo ? 'nombre-reemplazado' : ''}">${a.nombre}</span>
-            ${a.reemplazo ? `<span class="reemplazo-inline"><i class="fa-solid fa-arrow-right-arrow-left"></i> ${a.reemplazo}</span>` : ''}
-            ${tieneConflicto ? `<span class="conflicto-tag" onclick="verSugerencias(${a.arbitro_id},${p.id},'${a.nombre}')">⚠ Ver reemplazos</span>` : ''}
-            <button class="btn-confirmar ${a.confirmado ? 'confirmado' : ''}" onclick="toggleConfirmacion(${a.id}, this)" title="${a.confirmado ? 'Confirmado — clic para desmarcar' : 'Marcar como confirmado'}">
-              <i class="fa-solid ${a.confirmado ? 'fa-circle-check' : 'fa-circle'}"></i>
-              ${a.confirmado ? 'Confirmado' : 'Confirmar'}
-            </button>
+            <div class="oficial-info">
+              <span class="rol">${a.rol}:</span>
+              <span class="nombre ${a.reemplazo ? 'nombre-reemplazado' : ''}">${a.nombre}</span>
+              ${a.reemplazo ? `<span class="reemplazo-inline"><i class="fa-solid fa-arrow-right-arrow-left"></i> ${a.reemplazo}</span>` : ''}
+              ${tieneConflicto ? `<span class="conflicto-tag" onclick="verSugerencias(${a.arbitro_id},${p.id},'${a.nombre}')">⚠ Reemplazos</span>` : ''}
+            </div>
+            <div class="oficial-acciones">
+              <button class="btn-wa-designacion" onclick="abrirWhatsAppDesignacion(${p.id},${a.id})" title="Enviar designación por WhatsApp">
+                <i class="fa-brands fa-whatsapp"></i>
+              </button>
+              <button class="btn-confirmar ${a.confirmado ? 'confirmado' : ''}" onclick="toggleConfirmacion(${a.id}, this)" title="${a.confirmado ? 'Confirmado — clic para desmarcar' : 'Marcar como confirmado'}">
+                <i class="fa-solid ${a.confirmado ? 'fa-circle-check' : 'fa-circle'}"></i>
+                ${a.confirmado ? 'Confirmó' : 'Confirmar'}
+              </button>
+            </div>
           </div>`;
         }).join('')}
       </div>
