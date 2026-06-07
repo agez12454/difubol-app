@@ -304,7 +304,7 @@ async function cargarPartidos() {
               <span class="rol">${a.rol}:</span>
               <span class="nombre ${a.reemplazo ? 'nombre-reemplazado' : ''}">${a.nombre}</span>
               ${a.reemplazo ? `<span class="reemplazo-inline"><i class="fa-solid fa-arrow-right-arrow-left"></i> ${a.reemplazo}</span>` : ''}
-              ${tieneConflicto ? `<span class="conflicto-tag" onclick="verSugerencias(${a.arbitro_id},${p.id},'${a.nombre}')">⚠ Reemplazos</span>` : ''}
+              ${tieneConflicto ? `<span class="conflicto-tag" onclick="verSugerencias(${a.arbitro_id},${p.id},'${a.nombre}','${a.rol}')">⚠ Reemplazos</span>` : ''}
             </div>
             <div class="oficial-acciones">
               <button class="btn-wa-designacion" onclick="abrirWhatsAppDesignacion(${p.id},${a.id})" title="Enviar designación por WhatsApp">
@@ -431,10 +431,10 @@ async function cargarConflictos() {
       <div style="margin-top:14px">
         <p style="font-size:0.8rem;color:var(--text2);margin-bottom:8px"><i class="fa-solid fa-hand-pointer"></i> ¿En cuál partido necesita reemplazo?</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-sm btn-ghost" onclick="verSugerencias(${c.arbitro_id},${c.partido_origen_id},'${c.arbitro_nombre}','','${c.equipos_origen} - ${c.fecha_origen} - ${c.estadio_origen}')">
+          <button class="btn btn-sm btn-ghost" onclick="verSugerencias(${c.arbitro_id},${c.partido_origen_id},'${c.arbitro_nombre}','${c.rol_en_este}','${c.equipos_origen} - ${c.fecha_origen} - ${c.estadio_origen}')">
             <i class="fa-solid fa-shuffle"></i> Partido 1: ${c.equipos_origen} (${c.fecha_origen})
           </button>
-          <button class="btn btn-sm btn-ghost" onclick="verSugerencias(${c.arbitro_id},${c.partido_conflicto_id},'${c.arbitro_nombre}','','${c.equipos_conflicto} - ${c.fecha_conflicto} - ${c.estadio_conflicto}')">
+          <button class="btn btn-sm btn-ghost" onclick="verSugerencias(${c.arbitro_id},${c.partido_conflicto_id},'${c.arbitro_nombre}','${c.rol_en_conflicto}','${c.equipos_conflicto} - ${c.fecha_conflicto} - ${c.estadio_conflicto}')">
             <i class="fa-solid fa-shuffle"></i> Partido 2: ${c.equipos_conflicto} (${c.fecha_conflicto})
           </button>
         </div>
