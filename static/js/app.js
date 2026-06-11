@@ -244,9 +244,12 @@ document.getElementById('btn-guardar-partido').addEventListener('click', async (
     partidoEditandoId = null;
     await cargarPartidos();
 
+    if (res.no_encontrados && res.no_encontrados.length > 0) {
+      toast(`⚠️ Árbitros no registrados (no asignados):\n${res.no_encontrados.join('\n')}`, 'error');
+    }
     if (res.tiene_conflicto) {
       toast(`⚠️ Partido guardado con ${res.conflictos.length} conflicto(s)`, 'error');
-    } else {
+    } else if (!res.no_encontrados || res.no_encontrados.length === 0) {
       toast('Partido guardado sin conflictos ✓');
     }
   } catch (e) {

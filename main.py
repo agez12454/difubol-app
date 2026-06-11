@@ -474,26 +474,28 @@ def guardar_partido(data: PartidoManual, jornada_id: Optional[int] = None, db: S
         db.add(partido)
         db.flush()
 
-    # Crear asignaciones: buscar árbitro por nombre
+    # Crear asignaciones: buscar árbitro por nombre, advertir si no existe
+    no_encontrados = []
     for asig in data.asignaciones:
         if not asig.get("nombre"):
             continue
         nombre_limpio = asig["nombre"].split("(")[0].strip().upper()
         arbitro = db.query(Arbitro).filter(Arbitro.nombre == nombre_limpio).first()
         if not arbitro:
-            # Extraer categoría del paréntesis si existe
-            cat_match = re.search(r"\(([^)]+)\)", asig["nombre"])
-            categoria = cat_match.group(1).strip() if cat_match else "SIN CATEGORÍA"
-            arbitro = Arbitro(nombre=nombre_limpio, categoria=categoria)
-            db.add(arbitro)
-            db.flush()
+            no_encontrados.append(f"{nombre_limpio} ({asig['rol']})")
+            continue
 
         a = AsignacionPartido(partido_id=partido.id, arbitro_id=arbitro.id, rol=asig["rol"])
         db.add(a)
 
     db.commit()
     conflictos = detectar_conflictos(partido.id, db)
-    return {"id": partido.id, "conflictos": conflictos, "tiene_conflicto": len(conflictos) > 0}
+    return {
+        "id": partido.id,
+        "conflictos": conflictos,
+        "tiene_conflicto": len(conflictos) > 0,
+        "no_encontrados": no_encontrados,
+    }
 
 
 @app.delete("/api/partidos/{partido_id}")
