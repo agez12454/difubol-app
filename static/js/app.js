@@ -1004,32 +1004,42 @@ function filtrarStats() {
     lista.sort((a,b) => (b.linked ? 1 : 0) - (a.linked ? 1 : 0));
   }
 
+  // Competiciones únicas con al menos 1 partido
+  const comps = [...new Set(lista.flatMap(a => Object.keys(a.torneos || {})))].sort();
+
+  // Encabezado dinámico
+  const thead = document.getElementById('stats-thead-row');
+  if (thead) {
+    thead.innerHTML = `
+      <th>#</th><th>Árbitro</th>
+      <th title="Total">Tot.</th>
+      <th title="Árbitro Principal">Árbitro</th>
+      <th title="1er Asistente">A1</th>
+      <th title="2do Asistente">A2</th>
+      <th title="Cuarto Árbitro">4to</th>
+      ${comps.map(c => `<th title="${c}" style="font-size:0.72rem;max-width:70px;white-space:normal">${c}</th>`).join('')}
+    `;
+  }
+
   const tbody = document.getElementById('stats-tbody');
   tbody.innerHTML = lista.map((a, i) => {
-    const torneosStr = Object.entries(a.torneos)
-      .sort((x,y) => y[1]-x[1])
-      .map(([t,n]) => `<span class="torneo-tag">${t.replace('CLUBES','').replace('LIGAS','L').trim()} <b>${n}</b></span>`)
-      .join('');
-
     const linkIcon = a.linked
       ? `<span class="stats-link-dot linked" title="Vinculado a árbitro en DB"></span>`
       : `<span class="stats-link-dot unlinked" title="No encontrado en la DB: ${(a.nombres_excel||[a.nombre]).join(' / ')}">?</span>`;
-
     const excelHint = (!a.linked && a.nombres_excel?.length)
       ? `<div class="stats-excel-hint">${a.nombres_excel.join(' / ')}</div>` : '';
-
     const rowClass = a.linked ? '' : 'stats-row-unlinked';
+    const num = v => v > 0 ? v : '<span style="opacity:.3">—</span>';
 
     return `<tr class="${rowClass}">
       <td class="rank-num">${i+1}</td>
       <td class="arb-nombre">${linkIcon}<strong>${a.nombre}</strong>${excelHint}</td>
       <td class="num-total"><span class="badge-total">${a.total}</span></td>
-      <td class="num-rol" title="Árbitro Principal">${a.arbitro_principal > 0 ? `<span class="rol-badge principal">${a.arbitro_principal}</span>` : '<span style="opacity:.3">—</span>'}</td>
-      <td class="num-rol">${a.primer_asistente > 0 ? `<span class="rol-badge ast1">${a.primer_asistente}</span>` : '<span style="opacity:.3">—</span>'}</td>
-      <td class="num-rol">${a.segundo_asistente > 0 ? `<span class="rol-badge ast2">${a.segundo_asistente}</span>` : '<span style="opacity:.3">—</span>'}</td>
-      <td class="num-rol">${a.cuarto_arbitro > 0 ? `<span class="rol-badge cuarto">${a.cuarto_arbitro}</span>` : '<span style="opacity:.3">—</span>'}</td>
-      <td style="color:var(--text2);font-size:0.82rem">${a.jornadas}</td>
-      <td style="font-size:0.75rem">${torneosStr}</td>
+      <td class="num-rol">${num(a.arbitro_principal)}</td>
+      <td class="num-rol">${num(a.primer_asistente)}</td>
+      <td class="num-rol">${num(a.segundo_asistente)}</td>
+      <td class="num-rol">${num(a.cuarto_arbitro)}</td>
+      ${comps.map(c => `<td class="num-rol" style="font-size:0.82rem">${num((a.torneos||{})[c] || 0)}</td>`).join('')}
     </tr>`;
   }).join('');
 }
