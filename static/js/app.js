@@ -705,7 +705,7 @@ async function cargarArbitros() {
   }
 
   cont.innerHTML = `
-    <div class="card" style="padding:0;overflow:hidden">
+    <div class="card" style="padding:0;overflow-x:auto">
       <table class="ranking-table">
         <thead>
           <tr>
