@@ -714,11 +714,7 @@ async function cargarArbitros() {
           <tr>
             <th>#</th>
             <th>Árbitro</th>
-            <th>Central</th>
-            <th>1° Asist.</th>
-            <th>2° Asist.</th>
-            <th>4° Árb.</th>
-            <th>Total</th>
+            <th>Categoría</th>
             <th>WhatsApp</th>
             <th></th>
           </tr>
@@ -728,11 +724,7 @@ async function cargarArbitros() {
             <tr id="arb-row-${a.id}">
               <td class="rank">${i + 1}</td>
               <td class="arb-name" id="arb-name-${a.id}">${a.nombre}</td>
-              <td class="num">${a.por_rol['Árbitro'] || 0}</td>
-              <td class="num">${a.por_rol['1° árbitro asistente'] || 0}</td>
-              <td class="num">${a.por_rol['2° árbitro asistente'] || 0}</td>
-              <td class="num">${a.por_rol['Cuarto árbitro'] || 0}</td>
-              <td class="num total"><strong>${a.total_partidos}</strong></td>
+              <td style="font-size:0.8rem;color:var(--text2)">${a.categoria}</td>
               <td>
                 <div class="telefono-cell">
                   <input class="telefono-input" type="tel" placeholder="573001234567" value="${a.telefono || ''}"
