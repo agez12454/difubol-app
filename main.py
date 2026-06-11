@@ -498,6 +498,42 @@ def guardar_partido(data: PartidoManual, jornada_id: Optional[int] = None, db: S
     }
 
 
+@app.put("/api/partidos/{partido_id}")
+def actualizar_partido(partido_id: int, data: PartidoManual, db: Session = Depends(get_db)):
+    partido = db.query(Partido).filter(Partido.id == partido_id).first()
+    if not partido:
+        raise HTTPException(status_code=404, detail="Partido no encontrado")
+
+    partido.equipo_local = data.equipo_local
+    partido.equipo_visitante = data.equipo_visitante
+    partido.competicion = data.competicion
+    partido.fecha_jornada = data.fecha_jornada
+    partido.estadio = data.estadio
+    partido.fecha_hora = parse_fecha(data.fecha_hora)
+    partido.numero_partido = data.numero_partido
+    partido.departamento = data.departamento
+    partido.ciudad = data.ciudad
+
+    # Reemplazar asignaciones
+    db.query(AsignacionPartido).filter(AsignacionPartido.partido_id == partido.id).delete()
+    for asig in data.asignaciones:
+        if not asig.get("nombre"):
+            continue
+        nombre_limpio = asig["nombre"].split("(")[0].strip().upper()
+        arbitro = db.query(Arbitro).filter(Arbitro.nombre == nombre_limpio).first()
+        if not arbitro:
+            cat_match = re.search(r"\(([^)]+)\)", asig["nombre"])
+            categoria = cat_match.group(1).strip() if cat_match else "SIN CATEGORÍA"
+            arbitro = Arbitro(nombre=nombre_limpio, categoria=categoria)
+            db.add(arbitro)
+            db.flush()
+        db.add(AsignacionPartido(partido_id=partido.id, arbitro_id=arbitro.id, rol=asig["rol"]))
+
+    db.commit()
+    conflictos = detectar_conflictos(partido.id, db)
+    return {"id": partido.id, "conflictos": conflictos, "tiene_conflicto": len(conflictos) > 0}
+
+
 @app.delete("/api/partidos/{partido_id}")
 def eliminar_partido(partido_id: int, db: Session = Depends(get_db)):
     partido = db.query(Partido).filter(Partido.id == partido_id).first()

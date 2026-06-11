@@ -234,9 +234,12 @@ document.getElementById('btn-guardar-partido').addEventListener('click', async (
   if (!jornadaActual) { toast('Selecciona o crea una jornada primero', 'error'); return; }
 
   try {
-    const urlGuardar = jornadaActual ? `/api/partidos?jornada_id=${jornadaActual}` : '/api/partidos';
-    const res = await api(urlGuardar, {
-      method: 'POST',
+    const url = partidoEditandoId
+      ? `/api/partidos/${partidoEditandoId}`
+      : (jornadaActual ? `/api/partidos?jornada_id=${jornadaActual}` : '/api/partidos');
+    const method = partidoEditandoId ? 'PUT' : 'POST';
+    const res = await api(url, {
+      method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(datos),
     });
