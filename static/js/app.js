@@ -379,7 +379,6 @@ async function cargarPartidos() {
 async function editarPartido(id) {
   try {
     const p = await api(`/api/partidos/${id}`);
-    partidoEditandoId = id;
     llenarFormulario({
       numero: p.numero,
       equipo_local: p.equipo_local,
@@ -393,6 +392,7 @@ async function editarPartido(id) {
       ciudad: p.ciudad,
       asignaciones: p.asignaciones.map(a => ({ rol: a.rol, nombre: a.nombre })),
     });
+    partidoEditandoId = id; // asignar DESPUÉS de llenarFormulario para que no lo resetee
     document.getElementById('form-titulo').textContent = 'Editar partido';
     document.getElementById('form-partido').classList.remove('hidden');
     document.getElementById('form-partido').scrollIntoView({ behavior: 'smooth' });
