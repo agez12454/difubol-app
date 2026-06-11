@@ -106,6 +106,16 @@ document.getElementById('btn-subir-imagen').addEventListener('click', () => {
   resetUpload();
 });
 
+document.getElementById('btn-nuevo-manual').addEventListener('click', () => {
+  document.getElementById('upload-area').classList.add('hidden');
+  llenarFormulario({});
+  partidoEditandoId = null;
+  document.getElementById('form-titulo').textContent = 'Nuevo partido';
+  document.getElementById('imagen-referencia').classList.add('hidden');
+  document.getElementById('form-partido').classList.remove('hidden');
+  document.getElementById('form-partido').scrollIntoView({ behavior: 'smooth' });
+});
+
 const dropZone = document.getElementById('drop-zone');
 const fileInput = document.getElementById('file-input');
 

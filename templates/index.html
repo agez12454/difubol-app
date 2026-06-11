@@ -89,9 +89,14 @@
     <section id="tab-partidos" class="tab active">
       <div class="section-header">
         <h2>Partidos</h2>
-        <button class="btn btn-primary" id="btn-subir-imagen">
-          <i class="fa-solid fa-image"></i><span class="btn-label-text"> Subir imagen</span>
-        </button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary" id="btn-subir-imagen">
+            <i class="fa-solid fa-image"></i><span class="btn-label-text"> Subir imagen</span>
+          </button>
+          <button class="btn btn-ghost" id="btn-nuevo-manual">
+            <i class="fa-solid fa-pen-to-square"></i><span class="btn-label-text"> Agregar manualmente</span>
+          </button>
+        </div>
       </div>
 
       <div id="upload-area" class="upload-area hidden">
