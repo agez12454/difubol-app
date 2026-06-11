@@ -1145,7 +1145,7 @@ async def restaurar_db_form():
 
 @app.post("/admin/restaurar-db")
 async def restaurar_db(file: UploadFile = File(...), clave: str = ""):
-    if clave != os.getenv("ADMIN_CLAVE", ""):
+    if clave.strip() != os.getenv("ADMIN_CLAVE", "").strip():
         raise HTTPException(status_code=403, detail="Clave incorrecta")
     contenido = await file.read()
     with open(_DB_FILE_PATH, "wb") as f:
