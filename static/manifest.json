@@ -1,0 +1,18 @@
+{
+  "name": "Gestor Árbitros Difutbol",
+  "short_name": "Árbitros",
+  "description": "Gestión de árbitros y partidos Difutbol",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0e0e0e",
+  "theme_color": "#0099CC",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/static/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable any"
+    }
+  ]
+}

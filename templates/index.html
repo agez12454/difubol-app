@@ -2,40 +2,98 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gestor Árbitros Difutbol</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Árbitros Difutbol</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="/static/manifest.json" />
+  <meta name="theme-color" content="#0099CC" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Árbitros" />
+  <link rel="apple-touch-icon" href="/static/icons/icon.svg" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
   <link rel="stylesheet" href="/static/css/style.css" />
 </head>
-<body>
+<body class="view-desktop">
+
+  <!-- ── HEADER ─────────────────────────────────────────────────── -->
   <header>
     <div class="header-inner">
-      <div class="logo"><i class="fa-solid fa-whistle"></i> Gestor Árbitros Difutbol</div>
+      <div class="logo">
+        <i class="fa-solid fa-whistle"></i>
+        <span class="logo-text"> Gestor Árbitros Difutbol</span>
+      </div>
+
       <div class="jornada-selector">
         <select id="select-jornada">
           <option value="">— Selecciona jornada —</option>
         </select>
-        <button class="btn btn-primary btn-sm" id="btn-nueva-jornada"><i class="fa-solid fa-plus"></i> Nueva</button>
+        <button class="btn btn-primary btn-sm" id="btn-nueva-jornada">
+          <i class="fa-solid fa-plus"></i><span class="btn-label-text"> Nueva</span>
+        </button>
+        <button class="btn btn-danger btn-sm" id="btn-eliminar-jornada" disabled title="Eliminar jornada seleccionada">
+          <i class="fa-solid fa-trash"></i>
+        </button>
       </div>
-      <nav>
+
+      <nav id="top-nav">
         <button class="nav-btn active" data-tab="partidos"><i class="fa-solid fa-calendar-days"></i> Partidos</button>
-        <button class="nav-btn" data-tab="conflictos"><i class="fa-solid fa-triangle-exclamation"></i> Conflictos <span id="badge-conflictos" class="badge hidden">0</span></button>
+        <button class="nav-btn" data-tab="conflictos">
+          <i class="fa-solid fa-triangle-exclamation"></i> Conflictos
+          <span id="badge-conflictos" class="badge hidden">0</span>
+        </button>
         <button class="nav-btn" data-tab="arbitros"><i class="fa-solid fa-user-tie"></i> Árbitros</button>
+        <button class="nav-btn" data-tab="estadisticas"><i class="fa-solid fa-chart-bar"></i> Estadísticas</button>
       </nav>
+
+      <!-- Toggle vista móvil / escritorio -->
+      <button class="btn-view-toggle" id="btn-view-toggle" title="Cambiar vista">
+        <i class="fa-solid fa-mobile-screen" id="view-icon"></i>
+      </button>
     </div>
   </header>
 
+  <!-- ── BOTTOM NAV (solo vista móvil) ─────────────────────────── -->
+  <nav class="bottom-nav" id="bottom-nav">
+    <button class="bnav-btn active" data-tab="partidos">
+      <i class="fa-solid fa-calendar-days"></i>
+      <span>Partidos</span>
+    </button>
+    <button class="bnav-btn" data-tab="conflictos">
+      <div class="bnav-icon-wrap">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span id="badge-conflictos-m" class="badge hidden">0</span>
+      </div>
+      <span>Conflictos</span>
+    </button>
+    <button class="bnav-btn" data-tab="arbitros">
+      <i class="fa-solid fa-user-tie"></i>
+      <span>Árbitros</span>
+    </button>
+    <button class="bnav-btn" data-tab="estadisticas">
+      <i class="fa-solid fa-chart-bar"></i>
+      <span>Stats</span>
+    </button>
+  </nav>
+
+  <!-- ── CONTENIDO ──────────────────────────────────────────────── -->
   <main>
+
     <!-- TAB: PARTIDOS -->
     <section id="tab-partidos" class="tab active">
       <div class="section-header">
         <h2>Partidos</h2>
         <button class="btn btn-primary" id="btn-subir-imagen">
-          <i class="fa-solid fa-image"></i> Subir imagen
+          <i class="fa-solid fa-image"></i><span class="btn-label-text"> Subir imagen</span>
         </button>
       </div>
 
-      <!-- Upload zone -->
       <div id="upload-area" class="upload-area hidden">
         <div class="upload-box" id="drop-zone">
           <i class="fa-solid fa-cloud-arrow-up"></i>
@@ -44,11 +102,9 @@
         </div>
       </div>
 
-      <!-- Formulario de partido con imagen al lado -->
       <div id="form-partido" class="card hidden">
         <h3 id="form-titulo">Datos del partido</h3>
         <div class="form-con-imagen">
-          <!-- Imagen de referencia -->
           <div id="imagen-referencia" class="imagen-ref hidden">
             <div class="imagen-ref-header">
               <span><i class="fa-solid fa-image"></i> Imagen de referencia</span>
@@ -64,7 +120,6 @@
               </div>
             </div>
           </div>
-          <!-- Formulario -->
           <div class="form-campos">
             <div class="form-grid">
               <div class="field"><label>Equipo local</label><input id="f-local" type="text" /></div>
@@ -77,66 +132,141 @@
             <h4><i class="fa-solid fa-users"></i> Oficiales del partido</h4>
             <div id="asignaciones-form"></div>
             <div class="form-actions">
-              <button class="btn btn-success" id="btn-guardar-partido"><i class="fa-solid fa-floppy-disk"></i> Guardar partido</button>
+              <button class="btn btn-success" id="btn-guardar-partido"><i class="fa-solid fa-floppy-disk"></i> Guardar</button>
               <button class="btn btn-ghost" id="btn-cancelar-form">Cancelar</button>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Lista de partidos -->
       <div id="lista-partidos" class="partidos-grid"></div>
     </section>
 
     <!-- TAB: CONFLICTOS -->
     <section id="tab-conflictos" class="tab hidden">
       <div class="section-header">
-        <h2><i class="fa-solid fa-triangle-exclamation"></i> Conflictos detectados</h2>
+        <h2><i class="fa-solid fa-triangle-exclamation"></i> Conflictos</h2>
         <a href="/api/exportar/excel" class="btn btn-success" download>
-          <i class="fa-solid fa-file-excel"></i> Exportar Excel
+          <i class="fa-solid fa-file-excel"></i><span class="btn-label-text"> Exportar Excel</span>
         </a>
       </div>
 
-      <!-- Reemplazos confirmados -->
-      <div id="reemplazos-confirmados"></div>
+      <div class="cseccion cseccion-danger" id="wrap-conflictos-pendientes">
+        <div class="cseccion-header">
+          <span class="cseccion-titulo"><i class="fa-solid fa-circle-exclamation"></i> Conflictos pendientes</span>
+          <span class="cseccion-badge badge-danger" id="badge-pendientes">0</span>
+        </div>
+        <div class="cseccion-body" id="lista-conflictos"></div>
+      </div>
 
-      <!-- Conflictos resueltos -->
-      <div id="conflictos-resueltos"></div>
+      <div class="cseccion cseccion-success hidden" id="wrap-reemplazos">
+        <div class="cseccion-header">
+          <span class="cseccion-titulo"><i class="fa-solid fa-arrow-right-arrow-left"></i> Reemplazos realizados</span>
+          <span class="cseccion-badge badge-success" id="badge-reemplazos">0</span>
+        </div>
+        <div class="cseccion-body" id="reemplazos-confirmados"></div>
+      </div>
 
-      <!-- Conflictos pendientes -->
-      <div id="lista-conflictos"></div>
+      <div class="cseccion cseccion-info hidden" id="wrap-conflictos-resueltos">
+        <div class="cseccion-header">
+          <span class="cseccion-titulo"><i class="fa-solid fa-circle-check"></i> Conflictos resueltos</span>
+          <span class="cseccion-badge badge-info" id="badge-resueltos">0</span>
+        </div>
+        <div class="cseccion-body" id="conflictos-resueltos"></div>
+      </div>
     </section>
 
     <!-- TAB: ÁRBITROS -->
     <section id="tab-arbitros" class="tab hidden">
       <div class="section-header">
         <h2>Árbitros</h2>
-        <div style="display:flex;gap:8px">
-          <label class="btn btn-ghost" style="cursor:pointer">
-            <i class="fa-solid fa-file-excel"></i> Importar Excel
-            <input type="file" id="excel-input" accept=".xlsx,.xls" hidden />
-          </label>
-        </div>
+        <label class="btn btn-ghost" style="cursor:pointer">
+          <i class="fa-solid fa-file-excel"></i><span class="btn-label-text"> Importar Excel</span>
+          <input type="file" id="excel-input" accept=".xlsx,.xls" hidden />
+        </label>
       </div>
 
-      <!-- Panel importar Excel -->
       <div id="excel-panel" class="card hidden">
         <h3><i class="fa-solid fa-file-excel"></i> Importar desde Excel</h3>
         <div id="excel-preview"></div>
       </div>
 
       <div class="card">
-        <h3>Agregar árbitro manualmente</h3>
+        <h3>Agregar árbitro</h3>
         <div class="form-row">
-          <div class="field"><label>Apellidos</label><input id="arb-apellidos" type="text" placeholder="APELLIDOS COMO APARECE EN EL COMET" /></div>
-          <div class="field"><label>Nombres</label><input id="arb-nombres" type="text" placeholder="NOMBRES COMO APARECE EN EL COMET" /></div>
-          <button class="btn btn-primary" id="btn-agregar-arbitro"><i class="fa-solid fa-plus"></i> Agregar</button>
+          <div class="field"><label>Apellidos</label><input id="arb-apellidos" type="text" placeholder="APELLIDOS" /></div>
+          <div class="field"><label>Nombres</label><input id="arb-nombres" type="text" placeholder="NOMBRES" /></div>
+          <button class="btn btn-primary" id="btn-agregar-arbitro"><i class="fa-solid fa-plus"></i><span class="btn-label-text"> Agregar</span></button>
         </div>
       </div>
 
-      <!-- Ranking -->
       <div id="lista-arbitros" class="arbitros-list"></div>
     </section>
+
+    <!-- TAB: ESTADÍSTICAS -->
+    <section id="tab-estadisticas" class="tab hidden">
+      <div class="section-header">
+        <h2><i class="fa-solid fa-chart-bar"></i> Estadísticas</h2>
+        <div style="display:flex;gap:10px;align-items:center">
+          <span id="stats-fuente" class="stats-source-label"></span>
+          <label class="btn btn-primary btn-sm" style="cursor:pointer">
+            <i class="fa-solid fa-file-excel"></i><span class="btn-label-text"> Cargar Excel</span>
+            <input type="file" accept=".xlsx" hidden onchange="cargarStatsExcel(this)" />
+          </label>
+        </div>
+      </div>
+
+      <div id="stats-resumen" class="stats-resumen hidden">
+        <div class="stat-card"><div class="stat-num" id="stat-total-arb">0</div><div class="stat-label">Vinculados</div></div>
+        <div class="stat-card"><div class="stat-num" id="stat-total-part">0</div><div class="stat-label">Designaciones</div></div>
+        <div class="stat-card"><div class="stat-num" id="stat-top-arb">—</div><div class="stat-label">Más designado</div></div>
+        <div class="stat-card"><div class="stat-num" id="stat-promedio">0</div><div class="stat-label">Promedio</div></div>
+      </div>
+
+      <div id="stats-link-info" class="stats-link-info hidden">
+        <i class="fa-solid fa-link"></i>
+        <span id="stat-no-vinculados"></span>
+        <button class="btn btn-ghost btn-sm" onclick="revincularStats()"><i class="fa-solid fa-rotate"></i> Re-vincular</button>
+      </div>
+
+      <div id="stats-filtros" class="hidden stats-filtros">
+        <input id="stats-buscar" type="text" placeholder="Buscar árbitro..." class="stats-input" oninput="filtrarStats()" />
+        <select id="stats-orden" class="stats-select" onchange="filtrarStats()">
+          <option value="total">Total ↓</option>
+          <option value="arbitro">Principal ↓</option>
+          <option value="nombre">Nombre A-Z</option>
+        </select>
+        <label class="stats-toggle-unlinked">
+          <input type="checkbox" id="stats-show-unlinked" checked onchange="filtrarStats()" />
+          Sin vincular
+        </label>
+      </div>
+
+      <div id="stats-tabla-wrap" class="hidden stats-tabla-scroll">
+        <table class="stats-tabla">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Árbitro</th>
+              <th title="Total">Tot.</th>
+              <th title="Árbitro Principal"><i class="fa-solid fa-whistle"></i></th>
+              <th title="1er Asistente">1°</th>
+              <th title="2do Asistente">2°</th>
+              <th title="Cuarto Árbitro">4°</th>
+              <th>Jor.</th>
+              <th>Torneos</th>
+            </tr>
+          </thead>
+          <tbody id="stats-tbody"></tbody>
+        </table>
+      </div>
+
+      <div id="stats-empty" class="stats-empty">
+        <i class="fa-solid fa-file-excel"></i>
+        <p>Carga el Excel de designaciones para ver las estadísticas</p>
+      </div>
+    </section>
+
   </main>
 
   <!-- Modal de sugerencias -->
@@ -153,5 +283,10 @@
   <div id="toast" class="toast hidden"></div>
 
   <script src="/static/js/app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+    }
+  </script>
 </body>
 </html>

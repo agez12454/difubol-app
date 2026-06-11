@@ -2,6 +2,9 @@ import os
 import base64
 import json
 import re
+import io
+import unicodedata
+from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import List, Optional
 
@@ -19,6 +22,15 @@ load_dotenv()
 init_db()
 
 app = FastAPI(title="Gestor de Árbitros")
+
+@app.middleware("http")
+async def no_cache_static(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+    return response
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 MATCH_DURATION_HOURS = 2  # Duración estimada de un partido
@@ -34,6 +46,7 @@ class ArbitroCreate(BaseModel):
 
 class ArbitroUpdate(BaseModel):
     telefono: Optional[str] = None
+    nombre: Optional[str] = None
 
 
 class PartidoManual(BaseModel):
@@ -47,6 +60,7 @@ class PartidoManual(BaseModel):
     numero_partido: str
     departamento: str
     ciudad: str
+    imagen_url: Optional[str] = None
     asignaciones: List[dict]  # [{"rol": "Árbitro", "nombre": "..."}]
 
 
@@ -72,6 +86,10 @@ def detectar_conflictos(partido_id: int, db: Session):
     fin_partido = partido.fecha_hora + timedelta(hours=MATCH_DURATION_HOURS)
 
     for asig in partido.asignaciones:
+        # Saltar si el árbitro fue eliminado (FK huérfana)
+        if asig.arbitro is None:
+            continue
+
         # Buscar otros partidos del mismo árbitro
         otras = (
             db.query(AsignacionPartido)
@@ -313,8 +331,13 @@ def actualizar_arbitro(arbitro_id: int, data: ArbitroUpdate, db: Session = Depen
         raise HTTPException(status_code=404, detail="Árbitro no encontrado")
     if data.telefono is not None:
         arbitro.telefono = data.telefono.strip()
+    if data.nombre is not None:
+        nuevo = data.nombre.strip().upper()
+        if not nuevo:
+            raise HTTPException(status_code=400, detail="El nombre no puede estar vacío")
+        arbitro.nombre = nuevo
     db.commit()
-    return {"id": arbitro.id, "telefono": arbitro.telefono}
+    return {"id": arbitro.id, "telefono": arbitro.telefono, "nombre": arbitro.nombre}
 
 
 @app.delete("/api/arbitros/{arbitro_id}")
@@ -351,28 +374,34 @@ def listar_partidos(jornada_id: Optional[int] = None, db: Session = Depends(get_
             {
                 "id": p.id,
                 "numero": p.numero,
+                "numero_partido": p.numero_partido or "",
+                "jornada_id": p.jornada_id,
+                "jornada_nombre": p.jornada.nombre if p.jornada else "",
                 "equipo_local": p.equipo_local,
                 "equipo_visitante": p.equipo_visitante,
                 "competicion": p.competicion,
+                "fecha_jornada": p.fecha_jornada or "",
                 "estadio": p.estadio,
                 "fecha_hora": p.fecha_hora.strftime("%d.%m.%Y %H:%M") if p.fecha_hora else "",
+                "departamento": p.departamento or "",
                 "ciudad": p.ciudad,
+                "imagen_url": p.imagen_url or "",
                 "asignaciones": [
                     {
                         "id": a.id,
                         "rol": a.rol,
-                        "nombre": a.arbitro.nombre,
-                        "categoria": a.arbitro.categoria,
+                        "nombre": a.arbitro.nombre if a.arbitro else "—",
+                        "categoria": a.arbitro.categoria if a.arbitro else "",
                         "arbitro_id": a.arbitro_id,
                         "confirmado": a.confirmado or False,
-                        "reemplazo": (lambda r: r.arbitro_reemplazo.nombre if r else None)(
+                        "reemplazo": (lambda r: r.arbitro_reemplazo.nombre if r and r.arbitro_reemplazo else None)(
                             db.query(Reemplazo).filter(
                                 Reemplazo.arbitro_original_id == a.arbitro_id,
                                 Reemplazo.partido_id == p.id
                             ).first()
                         ),
                     }
-                    for a in p.asignaciones
+                    for a in p.asignaciones if a.arbitro_id is not None
                 ],
                 "conflictos": conflictos,
                 "tiene_conflicto": len(conflictos) > 0,
@@ -400,8 +429,8 @@ def obtener_partido(partido_id: int, db: Session = Depends(get_db)):
         "departamento": p.departamento,
         "ciudad": p.ciudad,
         "asignaciones": [
-            {"rol": a.rol, "nombre": a.arbitro.nombre, "categoria": a.arbitro.categoria, "arbitro_id": a.arbitro_id}
-            for a in p.asignaciones
+            {"rol": a.rol, "nombre": a.arbitro.nombre if a.arbitro else "—", "categoria": a.arbitro.categoria if a.arbitro else "", "arbitro_id": a.arbitro_id}
+            for a in p.asignaciones if a.arbitro_id is not None
         ],
         "conflictos": conflictos,
         "tiene_conflicto": len(conflictos) > 0,
@@ -424,6 +453,8 @@ def guardar_partido(data: PartidoManual, jornada_id: Optional[int] = None, db: S
         existente.numero_partido = data.numero_partido
         existente.departamento = data.departamento
         existente.ciudad = data.ciudad
+        if data.imagen_url:
+            existente.imagen_url = data.imagen_url
         partido = existente
     else:
         partido = Partido(
@@ -438,6 +469,7 @@ def guardar_partido(data: PartidoManual, jornada_id: Optional[int] = None, db: S
             numero_partido=data.numero_partido,
             departamento=data.departamento,
             ciudad=data.ciudad,
+            imagen_url=data.imagen_url,
         )
         db.add(partido)
         db.flush()
@@ -494,11 +526,47 @@ async def procesar_imagen(file: UploadFile = File(...)):
     imagen_b64 = base64.b64encode(contenido).decode()
     media_type = file.content_type or "image/jpeg"
 
+    # Guardar imagen en disco para usarla después en WhatsApp
+    ext = file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "jpg"
+    nombre_archivo = f"{int(datetime.utcnow().timestamp() * 1000)}.{ext}"
+    ruta = os.path.join("static", "uploads", nombre_archivo)
+    os.makedirs(os.path.join("static", "uploads"), exist_ok=True)
+    with open(ruta, "wb") as f:
+        f.write(contenido)
+    imagen_url = f"/static/uploads/{nombre_archivo}"
+
     try:
         datos = extraer_datos_imagen(imagen_b64, media_type)
-        return {"ok": True, "datos": datos}
+        return {"ok": True, "datos": datos, "imagen_url": imagen_url}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error procesando imagen: {str(e)}")
+
+
+@app.post("/api/procesar-imagen-simple")
+async def subir_imagen_simple(file: UploadFile = File(...)):
+    """Guarda la imagen sin procesarla con IA."""
+    contenido = await file.read()
+    ext = file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "jpg"
+    nombre_archivo = f"{int(datetime.utcnow().timestamp() * 1000)}.{ext}"
+    ruta = os.path.join("static", "uploads", nombre_archivo)
+    os.makedirs(os.path.join("static", "uploads"), exist_ok=True)
+    with open(ruta, "wb") as f:
+        f.write(contenido)
+    return {"imagen_url": f"/static/uploads/{nombre_archivo}"}
+
+
+class ImagenUpdate(BaseModel):
+    imagen_url: str
+
+
+@app.patch("/api/partidos/{partido_id}/imagen")
+def actualizar_imagen_partido(partido_id: int, data: ImagenUpdate, db: Session = Depends(get_db)):
+    p = db.query(Partido).filter(Partido.id == partido_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Partido no encontrado")
+    p.imagen_url = data.imagen_url
+    db.commit()
+    return {"ok": True}
 
 
 # ─── API Conflictos y Sugerencias ────────────────────────────────────────────
@@ -812,3 +880,247 @@ async def confirmar_importacion(
 
     db.commit()
     return {"arbitros_creados": arbitros_creados, "partidos_creados": partidos_creados}
+
+
+# ─── Estadísticas desde Excel ──────────────────────────────────────────────────
+
+STATS_CACHE_PATH = "static/stats_cache.json"
+
+
+def _norm(texto: str) -> str:
+    """Quita tildes, mayúsculas, espacios extra. Normaliza para comparar."""
+    s = unicodedata.normalize("NFD", texto)
+    s = s.encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"\s+", " ", s.upper().strip())
+
+
+def _palabras(texto: str) -> list:
+    return _norm(texto).split()
+
+
+def _levenshtein(a: str, b: str) -> int:
+    """Distancia de edición entre dos strings."""
+    if len(a) < len(b):
+        a, b = b, a
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        curr = [i]
+        for j, cb in enumerate(b, 1):
+            curr.append(min(prev[j] + 1, curr[j-1] + 1, prev[j-1] + (ca != cb)))
+        prev = curr
+    return prev[-1]
+
+
+def _fuzzy_word(w1: str, w2: str) -> bool:
+    """True si las palabras son similares (typos de 1-2 chars en palabras largas)."""
+    if w1 == w2:
+        return True
+    max_len = max(len(w1), len(w2))
+    dist = _levenshtein(w1, w2)
+    if max_len >= 7 and dist <= 2:
+        return True
+    if max_len >= 5 and dist <= 1:
+        return True
+    return False
+
+
+def _score_match(excel_norm: str, db_norm: str) -> float:
+    """
+    Retorna score 0-1 de qué tan probable es que sean la misma persona.
+    Estrategia: los 2 apellidos deben coincidir (con tolerancia typo) y al menos el primer nombre.
+    """
+    ep = _palabras(excel_norm)
+    dp = _palabras(db_norm)
+    if len(ep) < 2 or len(dp) < 2:
+        return 0.0
+    # Apellidos: exactos primero, luego fuzzy (typos leves)
+    ap1_ok = ep[0] == dp[0] or _fuzzy_word(ep[0], dp[0])
+    ap2_ok = ep[1] == dp[1] or _fuzzy_word(ep[1], dp[1])
+    if not (ap1_ok and ap2_ok):
+        return 0.0
+    exact_ap = (ep[0] == dp[0] and ep[1] == dp[1])
+    # Primer nombre (3ra palabra)
+    if len(ep) >= 3 and len(dp) >= 3:
+        n1, n2 = ep[2], dp[2]
+        if n1 == n2:
+            return 1.0 if exact_ap else 0.85
+        if n1.startswith(n2) or n2.startswith(n1) or n1[0] == n2[0]:
+            return 0.85 if exact_ap else 0.75
+        # Fuzzy nombre también
+        if _fuzzy_word(n1, n2):
+            return 0.80 if exact_ap else 0.70
+        return 0.3
+    if len(ep) == 2:
+        return 0.75 if exact_ap else 0.65
+    return 0.0
+
+
+def _vincular_con_db(stats_raw: dict, db: Session) -> dict:
+    """
+    Toma el dict {nombre_excel: {...}} del Excel y fusiona entradas que
+    corresponden al mismo árbitro de la DB.
+    Retorna lista con campo arbitro_id, nombre_db, nombre_excel, linked.
+    """
+    arbitros_db = db.query(Arbitro).all()
+
+    # Precalcular versión normalizada de cada árbitro DB (sin coma)
+    db_info = []
+    for a in arbitros_db:
+        nombre_sin_coma = a.nombre.replace(", ", " ").replace(",", " ")
+        db_info.append({
+            "id": a.id,
+            "nombre_db": a.nombre,
+            "norm": _norm(nombre_sin_coma),
+        })
+
+    # Para cada entrada del Excel, buscar el mejor match en DB
+    mapping = {}  # nombre_excel → arbitro_id (o None)
+    for nombre_excel in stats_raw:
+        norm_excel = _norm(nombre_excel)
+        best_id, best_score = None, 0.0
+        for d in db_info:
+            s = _score_match(norm_excel, d["norm"])
+            if s > best_score:
+                best_score, best_id = s, d["id"]
+        mapping[nombre_excel] = best_id if best_score >= 0.75 else None
+
+    # Agrupar por arbitro_id (merge) o por nombre_excel si no vinculado
+    merged: dict = {}  # clave → acumulador
+
+    for nombre_excel, s in stats_raw.items():
+        arb_id = mapping[nombre_excel]
+        if arb_id is not None:
+            clave = f"db:{arb_id}"
+            arb = next(d for d in db_info if d["id"] == arb_id)
+            if clave not in merged:
+                merged[clave] = {
+                    "nombre": arb["nombre_db"],
+                    "arbitro_id": arb_id,
+                    "linked": True,
+                    "nombres_excel": [],
+                    "total": 0, "arbitro_principal": 0,
+                    "primer_asistente": 0, "segundo_asistente": 0,
+                    "cuarto_arbitro": 0, "torneos": defaultdict(int),
+                    "jornadas": set(),
+                }
+            merged[clave]["nombres_excel"].append(nombre_excel)
+            merged[clave]["total"]             += s["total"]
+            merged[clave]["arbitro_principal"] += s["arbitro_principal"]
+            merged[clave]["primer_asistente"]  += s["primer_asistente"]
+            merged[clave]["segundo_asistente"] += s["segundo_asistente"]
+            merged[clave]["cuarto_arbitro"]    += s["cuarto_arbitro"]
+            for t, n in s["torneos"].items():
+                merged[clave]["torneos"][t] += n
+            merged[clave]["jornadas"].update(s["jornadas"])
+        else:
+            clave = f"excel:{nombre_excel}"
+            merged[clave] = {
+                "nombre": nombre_excel,
+                "arbitro_id": None,
+                "linked": False,
+                "nombres_excel": [nombre_excel],
+                **s,
+                "torneos": dict(s["torneos"]),
+                "jornadas": s["jornadas"],
+            }
+
+    result = []
+    for entry in merged.values():
+        result.append({
+            "nombre":            entry["nombre"],
+            "arbitro_id":        entry["arbitro_id"],
+            "linked":            entry["linked"],
+            "nombres_excel":     entry["nombres_excel"],
+            "total":             entry["total"],
+            "arbitro_principal": entry["arbitro_principal"],
+            "primer_asistente":  entry["primer_asistente"],
+            "segundo_asistente": entry["segundo_asistente"],
+            "cuarto_arbitro":    entry["cuarto_arbitro"],
+            "torneos":           dict(entry["torneos"]),
+            "jornadas":          len(entry["jornadas"]),
+        })
+
+    result.sort(key=lambda x: (-x["total"], x["nombre"]))
+    return result
+
+
+@app.post("/api/stats/importar")
+async def importar_stats_excel(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    try:
+        import openpyxl
+    except ImportError:
+        raise HTTPException(status_code=500, detail="openpyxl no instalado")
+
+    contents = await file.read()
+    wb = openpyxl.load_workbook(io.BytesIO(contents), data_only=True)
+    ws = wb.active
+    filename = file.filename or "Excel"
+
+    stats_raw = defaultdict(lambda: {
+        "total": 0, "arbitro_principal": 0,
+        "primer_asistente": 0, "segundo_asistente": 0,
+        "cuarto_arbitro": 0, "torneos": defaultdict(int), "jornadas": set(),
+    })
+
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        if row[0] is None:
+            continue
+        torneo = str(row[1] or "").strip()
+        fecha  = row[3]
+        roles_nombres = [
+            ("arbitro_principal",  str(row[8]  or "").strip()),
+            ("primer_asistente",   str(row[9]  or "").strip()),
+            ("segundo_asistente",  str(row[10] or "").strip()),
+            ("cuarto_arbitro",     str(row[11] or "").strip()),
+        ]
+        for rol_key, nombre in roles_nombres:
+            if nombre:
+                stats_raw[nombre]["total"] += 1
+                stats_raw[nombre][rol_key] += 1
+                stats_raw[nombre]["torneos"][torneo] += 1
+                stats_raw[nombre]["jornadas"].add(fecha)
+
+    data = _vincular_con_db(stats_raw, db)
+    cache = {"filename": filename, "data": data}
+    with open(STATS_CACHE_PATH, "w", encoding="utf-8") as f:
+        json.dump(cache, f, ensure_ascii=False)
+    return cache
+
+
+@app.get("/api/stats")
+def obtener_stats():
+    if not os.path.exists(STATS_CACHE_PATH):
+        return {"filename": None, "data": []}
+    with open(STATS_CACHE_PATH, encoding="utf-8") as f:
+        return json.load(f)
+
+
+@app.post("/api/stats/revincular")
+def revincular_stats(db: Session = Depends(get_db)):
+    """Re-procesa el cache actual contra los árbitros actuales en la DB."""
+    if not os.path.exists(STATS_CACHE_PATH):
+        raise HTTPException(status_code=404, detail="No hay stats cargadas")
+    with open(STATS_CACHE_PATH, encoding="utf-8") as f:
+        cache = json.load(f)
+
+    # Reconstruir stats_raw desde el cache actual (usando nombres_excel)
+    stats_raw = defaultdict(lambda: {
+        "total": 0, "arbitro_principal": 0,
+        "primer_asistente": 0, "segundo_asistente": 0,
+        "cuarto_arbitro": 0, "torneos": defaultdict(int), "jornadas": set(),
+    })
+    for entry in cache["data"]:
+        for nex in entry.get("nombres_excel", [entry["nombre"]]):
+            stats_raw[nex]["total"]             += entry["total"]
+            stats_raw[nex]["arbitro_principal"] += entry["arbitro_principal"]
+            stats_raw[nex]["primer_asistente"]  += entry["primer_asistente"]
+            stats_raw[nex]["segundo_asistente"] += entry["segundo_asistente"]
+            stats_raw[nex]["cuarto_arbitro"]    += entry["cuarto_arbitro"]
+            for t, n in entry["torneos"].items():
+                stats_raw[nex]["torneos"][t] += n
+
+    data = _vincular_con_db(stats_raw, db)
+    cache["data"] = data
+    with open(STATS_CACHE_PATH, "w", encoding="utf-8") as f:
+        json.dump(cache, f, ensure_ascii=False)
+    return cache

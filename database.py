@@ -1,9 +1,11 @@
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, ForeignKey, Boolean, Text
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, ForeignKey, Boolean, Text, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
+import os
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./arbitros.db"
+_db_path = os.getenv("DB_PATH", "./arbitros.db")
+SQLALCHEMY_DATABASE_URL = f"sqlite:///{_db_path}"
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -30,7 +32,7 @@ class Jornada(Base):
     nombre = Column(String, nullable=False)  # "Jornada 11"
     creado_en = Column(DateTime, default=datetime.utcnow)
 
-    partidos = relationship("Partido", back_populates="jornada")
+    partidos = relationship("Partido", back_populates="jornada", cascade="all, delete-orphan")
 
 
 class Partido(Base):
@@ -48,6 +50,7 @@ class Partido(Base):
     numero_partido = Column(String)
     departamento = Column(String)
     ciudad = Column(String)
+    imagen_url = Column(String, nullable=True)
     creado_en = Column(DateTime, default=datetime.utcnow)
 
     jornada = relationship("Jornada", back_populates="partidos")
@@ -92,3 +95,17 @@ def get_db():
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+    # Migraciones automáticas para columnas nuevas en DBs antiguas
+    migraciones = [
+        "ALTER TABLE partidos ADD COLUMN jornada_id INTEGER REFERENCES jornadas(id)",
+        "ALTER TABLE arbitros ADD COLUMN telefono VARCHAR",
+        "ALTER TABLE asignaciones ADD COLUMN confirmado BOOLEAN DEFAULT 0",
+        "ALTER TABLE partidos ADD COLUMN imagen_url VARCHAR",
+    ]
+    with engine.connect() as conn:
+        for sql in migraciones:
+            try:
+                conn.execute(text(sql))
+                conn.commit()
+            except Exception:
+                pass  # La columna ya existe, ignorar

@@ -10,6 +10,7 @@ let selectedFile = null;
 let partidoEditandoId = null;
 let jornadaActual = null; // ID de la jornada seleccionada
 let partidosData = []; // Cache para generar mensajes WhatsApp
+let imagenUrlActual = null; // URL de la imagen cargada para el partido actual
 
 
 // ─── Jornadas ─────────────────────────────────────────────────────────────────
@@ -25,8 +26,27 @@ async function cargarJornadas() {
 
 document.getElementById('select-jornada').addEventListener('change', (e) => {
   jornadaActual = e.target.value ? parseInt(e.target.value) : null;
+  document.getElementById('btn-eliminar-jornada').disabled = !jornadaActual;
   cargarPartidos();
   cargarConflictos();
+});
+
+document.getElementById('btn-eliminar-jornada').addEventListener('click', async () => {
+  if (!jornadaActual) return;
+  const sel = document.getElementById('select-jornada');
+  const nombre = sel.options[sel.selectedIndex]?.text || 'esta jornada';
+  if (!confirm(`¿Eliminar "${nombre}"?\n\nSe borrarán todos sus partidos, asignaciones y reemplazos. Esta acción no se puede deshacer.`)) return;
+  try {
+    await api(`/api/jornadas/${jornadaActual}`, { method: 'DELETE' });
+    jornadaActual = null;
+    document.getElementById('btn-eliminar-jornada').disabled = true;
+    await cargarJornadas();
+    cargarPartidos();
+    cargarConflictos();
+    toast('Jornada eliminada');
+  } catch (e) {
+    toast(`Error: ${e.message}`, 'error');
+  }
 });
 
 document.getElementById('btn-nueva-jornada').addEventListener('click', async () => {
@@ -64,18 +84,20 @@ async function api(path, opts = {}) {
 }
 
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
-document.querySelectorAll('.nav-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab').forEach(t => { t.classList.add('hidden'); t.classList.remove('active'); });
-    btn.classList.add('active');
-    const tab = document.getElementById(`tab-${btn.dataset.tab}`);
-    tab.classList.remove('hidden');
-    tab.classList.add('active');
-    if (btn.dataset.tab === 'conflictos') cargarConflictos();
-    if (btn.dataset.tab === 'arbitros') cargarArbitros();
-    if (btn.dataset.tab === 'partidos') cargarPartidos();
-  });
+function switchTab(tabName) {
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabName));
+  document.querySelectorAll('.bnav-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabName));
+  document.querySelectorAll('.tab').forEach(t => { t.classList.add('hidden'); t.classList.remove('active'); });
+  const tab = document.getElementById(`tab-${tabName}`);
+  if (tab) { tab.classList.remove('hidden'); tab.classList.add('active'); }
+  if (tabName === 'conflictos')  cargarConflictos();
+  if (tabName === 'arbitros')    cargarArbitros();
+  if (tabName === 'partidos')    cargarPartidos();
+  if (tabName === 'estadisticas') cargarStats();
+}
+
+document.querySelectorAll('.nav-btn, .bnav-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
 });
 
 // ─── Upload imagen ─────────────────────────────────────────────────────────────
@@ -110,7 +132,7 @@ function mostrarPreview(file) {
     llenarFormulario({});
     document.getElementById('form-titulo').textContent = 'Datos del partido';
     document.getElementById('form-partido').classList.remove('hidden');
-    document.getElementById('form-partido').scrollIntoView({ behavior: 'smooth' });
+    document.getElementById('imagen-referencia').scrollIntoView({ behavior: 'smooth', block: 'start' });
     toast('Imagen cargada. Usa "Extraer datos con IA" o llena el formulario manualmente.');
   };
   reader.readAsDataURL(file);
@@ -128,6 +150,7 @@ document.getElementById('btn-procesar').addEventListener('click', async () => {
     fd.append('file', selectedFile);
     const res = await api('/api/procesar-imagen', { method: 'POST', body: fd });
     llenarFormulario(res.datos);
+    imagenUrlActual = res.imagen_url || null;
     document.getElementById('form-titulo').textContent = 'Datos extraídos — revisa y confirma';
     toast('✓ Datos extraídos. Revisa y guarda.');
   } catch (e) {
@@ -140,6 +163,7 @@ document.getElementById('btn-procesar').addEventListener('click', async () => {
 
 function resetUpload() {
   selectedFile = null;
+  imagenUrlActual = null;
   fileInput.value = '';
   document.getElementById('preview-img').src = '';
   document.getElementById('imagen-referencia').classList.add('hidden');
@@ -189,6 +213,7 @@ function leerFormulario() {
     numero_partido: '',
     departamento: '',
     ciudad: document.getElementById('f-ciudad').value.trim(),
+    imagen_url: imagenUrlActual || null,
     asignaciones,
   };
 }
@@ -236,21 +261,42 @@ function abrirWhatsAppDesignacion(partidoId, asignacionId) {
   const a = p.asignaciones.find(x => x.id === asignacionId);
   if (!a) return;
   const lugar = [p.estadio, p.ciudad].filter(Boolean).join(', ');
-  const reemplazoInfo = a.reemplazo ? `\n⚠️ *Nota:* Será reemplazado por ${a.reemplazo}` : '';
+  const reemplazoInfo = a.reemplazo ? `\n⚠️ *Nota:* Ha sido reemplazado/a por *${a.reemplazo}*` : '';
+
+  const lineas = [];
+  if (p.jornada_nombre)  lineas.push(`📌 *Jornada:* ${p.jornada_nombre}`);
+  if (p.numero_partido)  lineas.push(`🔢 *N° Partido:* ${p.numero_partido}`);
+  if (p.competicion)     lineas.push(`🏆 *Competición:* ${p.competicion}`);
+  if (p.fecha_hora)      lineas.push(`📅 *Fecha/Hora:* ${p.fecha_hora}`);
+  if (lugar)             lineas.push(`🏟️ *Lugar:* ${lugar}`);
+  if (p.departamento)    lineas.push(`📍 *Departamento:* ${p.departamento}`);
+
+  const ROL_EMOJI = {
+    'Árbitro Principal': '🟡',
+    '1er Asistente':     '🟢',
+    '2do Asistente':     '🟢',
+    'Cuarto Árbitro':    '🔵',
+  };
+  const cuerpo = p.asignaciones.map(x => {
+    const emoji = ROL_EMOJI[x.rol] || '⚪';
+    const nombre = x.reemplazo ? `~${x.nombre}~ → *${x.reemplazo}*` : `*${x.nombre}*`;
+    return `${emoji} ${x.rol}: ${nombre}`;
+  }).join('\n');
+
   const msg =
 `📋 *DESIGNACIÓN OFICIAL - DIFUTBOL*
 
 ⚽ *${p.equipo_local} vs ${p.equipo_visitante}*
-🏆 ${p.competicion || '—'}
-📅 ${p.fecha_hora}
-🏟️ ${lugar || 'Por confirmar'}
+${lineas.join('\n')}
+
+👥 *Cuerpo Arbitral:*
+${cuerpo}
 
 Estimado(a) *${a.nombre}*
-Su rol: *${a.rol}*${reemplazoInfo}
+🎽 Su rol: *${a.rol}*${reemplazoInfo}
 
-Por favor confirme su asistencia respondiendo:
-✅ *CONFIRMO*
-❌ *NO PUEDO*`;
+Por favor confirme su asistencia.`;
+
   window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
@@ -263,13 +309,12 @@ async function cargarPartidos() {
 
   // Actualizar badge
   const totalConflictos = partidos.filter(p => p.tiene_conflicto).length;
-  const badge = document.getElementById('badge-conflictos');
-  if (totalConflictos > 0) {
+  ['badge-conflictos', 'badge-conflictos-m'].forEach(id => {
+    const badge = document.getElementById(id);
+    if (!badge) return;
     badge.textContent = totalConflictos;
-    badge.classList.remove('hidden');
-  } else {
-    badge.classList.add('hidden');
-  }
+    badge.classList.toggle('hidden', totalConflictos === 0);
+  });
 
   if (partidos.length === 0) {
     cont.innerHTML = `<div class="empty-state"><i class="fa-solid fa-calendar-xmark"></i><p>No hay partidos cargados.<br>Sube una imagen o agrega uno manualmente.</p></div>`;
@@ -304,11 +349,14 @@ async function cargarPartidos() {
               <span class="rol">${a.rol}:</span>
               <span class="nombre ${a.reemplazo ? 'nombre-reemplazado' : ''}">${a.nombre}</span>
               ${a.reemplazo ? `<span class="reemplazo-inline"><i class="fa-solid fa-arrow-right-arrow-left"></i> ${a.reemplazo}</span>` : ''}
-              ${tieneConflicto ? `<span class="conflicto-tag" onclick="verSugerencias(${a.arbitro_id},${p.id},'${a.nombre}','${a.rol}')">⚠ Reemplazos</span>` : ''}
+              ${tieneConflicto ? `<span class="conflicto-tag">⚠ Cruce</span>` : ''}
             </div>
             <div class="oficial-acciones">
               <button class="btn-wa-designacion" onclick="abrirWhatsAppDesignacion(${p.id},${a.id})" title="Enviar designación por WhatsApp">
                 <i class="fa-brands fa-whatsapp"></i>
+              </button>
+              <button class="btn-cambiar" onclick="verSugerencias(${a.arbitro_id},${p.id},'${a.nombre}','${a.rol}','')" title="Cambiar árbitro">
+                <i class="fa-solid fa-arrow-right-arrow-left"></i> Cambiar
               </button>
               <button class="btn-confirmar ${a.confirmado ? 'confirmado' : ''}" onclick="toggleConfirmacion(${a.id}, this)" title="${a.confirmado ? 'Confirmado — clic para desmarcar' : 'Marcar como confirmado'}">
                 <i class="fa-solid ${a.confirmado ? 'fa-circle-check' : 'fa-circle'}"></i>
@@ -374,73 +422,78 @@ async function cargarConflictos() {
   cargarReemplazos();
   const url = jornadaActual ? `/api/conflictos?jornada_id=${jornadaActual}` : '/api/conflictos';
   const conflictos = await api(url);
-  const cont = document.getElementById('lista-conflictos');
-  const contResueltos = document.getElementById('conflictos-resueltos');
 
   const pendientes = conflictos.filter(c => !c.resuelto);
-  const resueltos = conflictos.filter(c => c.resuelto);
+  const resueltos  = conflictos.filter(c =>  c.resuelto);
 
-  // ── Resueltos ──
-  if (resueltos.length > 0) {
-    contResueltos.innerHTML = `
-      <div class="card" style="border-color:rgba(46,204,113,0.3);margin-bottom:16px">
-        <h3 style="color:var(--success);margin-bottom:14px"><i class="fa-solid fa-circle-check"></i> Conflictos resueltos (${resueltos.length})</h3>
-        ${resueltos.map(c => `
-          <div class="reemplazo-item">
-            <div>
-              <span class="reemplazo-nombre">${c.reemplazo_nombre}</span>
-              <span style="color:var(--text2)"> reemplaza a </span>
-              <span class="reemplazo-nombre">${c.arbitro_nombre}</span>
-              <div style="font-size:0.8rem;color:var(--text2);margin-top:3px">
-                ${c.reemplazo_partido_id === c.partido_origen_id
-                  ? `${c.equipos_origen} — ${c.fecha_origen}`
-                  : `${c.equipos_conflicto} — ${c.fecha_conflicto}`}
-              </div>
-            </div>
-          </div>`).join('')}
-      </div>`;
-  } else {
-    contResueltos.innerHTML = '';
-  }
+  // ── Sección: Conflictos pendientes ──
+  const contPend    = document.getElementById('lista-conflictos');
+  const wrapPend    = document.getElementById('wrap-conflictos-pendientes');
+  const badgePend   = document.getElementById('badge-pendientes');
+  badgePend.textContent = pendientes.length;
 
-  // ── Pendientes ──
   if (pendientes.length === 0) {
-    cont.innerHTML = `<div class="empty-state"><i class="fa-solid fa-circle-check" style="color:var(--success)"></i><p>No hay conflictos de horario detectados.</p></div>`;
-    return;
-  }
-
-  cont.innerHTML = pendientes.map(c => `
-    <div class="conflicto-card">
-      <div class="conflicto-titulo">
-        <i class="fa-solid fa-triangle-exclamation"></i>
-        ${c.arbitro_nombre}
-        <span class="tipo-badge tipo-${c.tipo}">${c.tipo === 'solapamiento' ? 'SOLAPAMIENTO' : 'MISMO DÍA'}</span>
-      </div>
-      <div class="conflicto-detalle">
-        <strong>Partido 1:</strong> ${c.equipos_origen} — ${c.fecha_origen} (${c.rol_en_este})
-        ${c.competicion_origen ? `<br><i class="fa-solid fa-trophy" style="color:var(--primary);font-size:0.75rem"></i> ${c.competicion_origen}` : ''}
-        ${c.estadio_origen ? `&nbsp;·&nbsp;<i class="fa-solid fa-location-dot" style="color:var(--primary);font-size:0.75rem"></i> ${c.estadio_origen}` : ''}
-        ${c.ciudad_origen ? `, ${c.ciudad_origen}` : ''}
-      </div>
-      <div class="conflicto-detalle">
-        <strong>Partido 2:</strong> ${c.equipos_conflicto} — ${c.fecha_conflicto} (${c.rol_en_conflicto})
-        ${c.competicion_conflicto ? `<br><i class="fa-solid fa-trophy" style="color:var(--primary);font-size:0.75rem"></i> ${c.competicion_conflicto}` : ''}
-        ${c.estadio_conflicto ? `&nbsp;·&nbsp;<i class="fa-solid fa-location-dot" style="color:var(--primary);font-size:0.75rem"></i> ${c.estadio_conflicto}` : ''}
-        ${c.ciudad_conflicto ? `, ${c.ciudad_conflicto}` : ''}
-      </div>
-      <div style="margin-top:14px">
-        <p style="font-size:0.8rem;color:var(--text2);margin-bottom:8px"><i class="fa-solid fa-hand-pointer"></i> ¿En cuál partido necesita reemplazo?</p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-sm btn-ghost" onclick="verSugerencias(${c.arbitro_id},${c.partido_origen_id},'${c.arbitro_nombre}','${c.rol_en_este}','${c.equipos_origen} - ${c.fecha_origen} - ${c.estadio_origen}')">
-            <i class="fa-solid fa-shuffle"></i> Partido 1: ${c.equipos_origen} (${c.fecha_origen})
-          </button>
-          <button class="btn btn-sm btn-ghost" onclick="verSugerencias(${c.arbitro_id},${c.partido_conflicto_id},'${c.arbitro_nombre}','${c.rol_en_conflicto}','${c.equipos_conflicto} - ${c.fecha_conflicto} - ${c.estadio_conflicto}')">
-            <i class="fa-solid fa-shuffle"></i> Partido 2: ${c.equipos_conflicto} (${c.fecha_conflicto})
-          </button>
+    contPend.innerHTML = `<div class="empty-state"><i class="fa-solid fa-circle-check" style="color:var(--success)"></i><p>¡Sin conflictos de horario!</p></div>`;
+  } else {
+    contPend.innerHTML = pendientes.map(c => `
+      <div class="conflicto-card">
+        <div class="conflicto-titulo">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          ${c.arbitro_nombre}
+          <span class="tipo-badge tipo-${c.tipo}">${c.tipo === 'solapamiento' ? 'SOLAPAMIENTO' : 'MISMO DÍA'}</span>
+        </div>
+        <div class="conflicto-detalle">
+          <strong>Partido 1:</strong> ${c.equipos_origen} — ${c.fecha_origen} (${c.rol_en_este})
+          ${c.competicion_origen ? `<br><i class="fa-solid fa-trophy" style="color:var(--primary);font-size:0.75rem"></i> ${c.competicion_origen}` : ''}
+          ${c.estadio_origen ? `&nbsp;·&nbsp;<i class="fa-solid fa-location-dot" style="color:var(--primary);font-size:0.75rem"></i> ${c.estadio_origen}` : ''}
+          ${c.ciudad_origen ? `, ${c.ciudad_origen}` : ''}
+        </div>
+        <div class="conflicto-detalle">
+          <strong>Partido 2:</strong> ${c.equipos_conflicto} — ${c.fecha_conflicto} (${c.rol_en_conflicto})
+          ${c.competicion_conflicto ? `<br><i class="fa-solid fa-trophy" style="color:var(--primary);font-size:0.75rem"></i> ${c.competicion_conflicto}` : ''}
+          ${c.estadio_conflicto ? `&nbsp;·&nbsp;<i class="fa-solid fa-location-dot" style="color:var(--primary);font-size:0.75rem"></i> ${c.estadio_conflicto}` : ''}
+          ${c.ciudad_conflicto ? `, ${c.ciudad_conflicto}` : ''}
+        </div>
+        <div style="margin-top:14px">
+          <p style="font-size:0.8rem;color:var(--text2);margin-bottom:8px"><i class="fa-solid fa-hand-pointer"></i> ¿En cuál partido necesita reemplazo?</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-sm btn-ghost" onclick="verSugerencias(${c.arbitro_id},${c.partido_origen_id},'${c.arbitro_nombre}','${c.rol_en_este}','${c.equipos_origen} - ${c.fecha_origen} - ${c.estadio_origen}')">
+              <i class="fa-solid fa-shuffle"></i> Partido 1: ${c.equipos_origen} (${c.fecha_origen})
+            </button>
+            <button class="btn btn-sm btn-ghost" onclick="verSugerencias(${c.arbitro_id},${c.partido_conflicto_id},'${c.arbitro_nombre}','${c.rol_en_conflicto}','${c.equipos_conflicto} - ${c.fecha_conflicto} - ${c.estadio_conflicto}')">
+              <i class="fa-solid fa-shuffle"></i> Partido 2: ${c.equipos_conflicto} (${c.fecha_conflicto})
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  `).join('');
+    `).join('');
+  }
+
+  // ── Sección: Conflictos resueltos ──
+  const contResueltos = document.getElementById('conflictos-resueltos');
+  const wrapResueltos = document.getElementById('wrap-conflictos-resueltos');
+  const badgeResueltos = document.getElementById('badge-resueltos');
+
+  if (resueltos.length > 0) {
+    badgeResueltos.textContent = resueltos.length;
+    wrapResueltos.classList.remove('hidden');
+    contResueltos.innerHTML = resueltos.map(c => `
+      <div class="reemplazo-item">
+        <div>
+          <span class="reemplazo-nombre">${c.reemplazo_nombre}</span>
+          <span style="color:var(--text2)"> reemplaza a </span>
+          <span class="reemplazo-nombre">${c.arbitro_nombre}</span>
+          <div style="font-size:0.8rem;color:var(--text2);margin-top:3px">
+            ${c.reemplazo_partido_id === c.partido_origen_id
+              ? `${c.equipos_origen} — ${c.fecha_origen}`
+              : `${c.equipos_conflicto} — ${c.fecha_conflicto}`}
+          </div>
+        </div>
+      </div>`).join('');
+  } else {
+    wrapResueltos.classList.add('hidden');
+    contResueltos.innerHTML = '';
+  }
 }
 
 // ─── Sugerencias ──────────────────────────────────────────────────────────────
@@ -453,6 +506,7 @@ async function verSugerencias(arbitroId, partidoId, nombre, rol = '', partidoInf
   modal.dataset.partidoId = partidoId;
   modal.dataset.rol = rol;
   modal.dataset.partidoInfo = partidoInfo;
+  modal.dataset.arbitroNombre = nombre;
 
   try {
     const sugerencias = await api(`/api/sugerencias/${arbitroId}/${partidoId}`);
@@ -490,7 +544,8 @@ async function asignarReemplazo(reemplazoId, reemplazoNombre, telefono) {
   const arbitroId = parseInt(modal.dataset.arbitroId);
   const partidoId = parseInt(modal.dataset.partidoId);
   const rol = modal.dataset.rol || 'Árbitro';
-  const partidoInfo = modal.dataset.partidoInfo || '';
+  const arbitroOriginalNombre = modal.dataset.arbitroNombre || '';
+  const partido = partidosData.find(p => p.id === partidoId);
 
   try {
     await api('/api/reemplazos', {
@@ -503,54 +558,127 @@ async function asignarReemplazo(reemplazoId, reemplazoNombre, telefono) {
         rol: rol,
       }),
     });
+
     modal.classList.add('hidden');
     toast(`✓ Reemplazo asignado: ${reemplazoNombre}`);
     cargarConflictos();
     cargarPartidos();
 
-    // Abrir WhatsApp si hay teléfono registrado
-    if (telefono) {
-      const tel = telefono.replace(/\D/g, '');
-      const msg = encodeURIComponent(
-        `Hola ${reemplazoNombre}, te informamos que has sido asignado como reemplazo en el partido:\n\n${partidoInfo}\n\nRol: ${rol}\n\n¿Confirmas tu participación?`
-      );
-      window.open(`https://wa.me/${tel}?text=${msg}`, '_blank');
-    }
+    mostrarModalNotificacion(reemplazoNombre, arbitroOriginalNombre, telefono, partido, rol);
+
   } catch (e) {
     toast(`Error: ${e.message}`, 'error');
   }
 }
 
+function mostrarModalNotificacion(reemplazoNombre, originalNombre, telefono, partido, rol) {
+  const lugar = [partido?.estadio, partido?.ciudad].filter(Boolean).join(', ');
+  const lineas = [];
+  if (partido?.jornada_nombre)  lineas.push(`📌 *Jornada:* ${partido.jornada_nombre}`);
+  if (partido?.numero_partido)  lineas.push(`🔢 *N° Partido:* ${partido.numero_partido}`);
+  if (partido?.competicion)     lineas.push(`🏆 *Competición:* ${partido.competicion}`);
+  if (partido?.fecha_hora)      lineas.push(`📅 *Fecha/Hora:* ${partido.fecha_hora}`);
+  if (lugar)                    lineas.push(`🏟️ *Lugar:* ${lugar}`);
+  if (partido?.departamento)    lineas.push(`📍 *Departamento:* ${partido.departamento}`);
+
+  const ROL_EMOJI = { 'Árbitro Principal': '🟡', '1er Asistente': '🟢', '2do Asistente': '🟢', 'Cuarto Árbitro': '🔵' };
+  const cuerpo = partido?.asignaciones?.map(x => {
+    const emoji = ROL_EMOJI[x.rol] || '⚪';
+    let nombre;
+    if (x.rol === rol && x.nombre === originalNombre) {
+      nombre = `~${x.nombre}~ → *${reemplazoNombre}*`;
+    } else if (x.reemplazo) {
+      nombre = `~${x.nombre}~ → *${x.reemplazo}*`;
+    } else {
+      nombre = `*${x.nombre}*`;
+    }
+    return `${emoji} ${x.rol}: ${nombre}`;
+  }).join('\n') || '';
+
+  const msg =
+`Hola *${reemplazoNombre}*, te informamos que has sido designado como:
+
+🎽 *${rol || 'Árbitro'}*
+⚽ *${partido ? partido.equipo_local + ' vs ' + partido.equipo_visitante : ''}*
+${lineas.join('\n')}
+
+👥 *Cuerpo Arbitral:*
+${cuerpo}
+
+↩️ *En reemplazo de:* ${originalNombre || '—'}
+
+Por favor confirme su asistencia.`;
+
+  const waUrl = telefono
+    ? `https://wa.me/${telefono.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`
+    : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+
+  let modalEl = document.getElementById('modal-notif-wa');
+  if (!modalEl) {
+    modalEl = document.createElement('div');
+    modalEl.id = 'modal-notif-wa';
+    modalEl.className = 'modal';
+    document.body.appendChild(modalEl);
+  }
+
+  modalEl.innerHTML = `
+    <div class="modal-content" style="max-width:480px">
+      <div class="modal-header">
+        <h3><i class="fa-brands fa-whatsapp" style="color:#25d366"></i> Notificar reemplazo</h3>
+        <button class="btn-close" onclick="document.getElementById('modal-notif-wa').classList.add('hidden')">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div style="padding:20px;display:flex;flex-direction:column;gap:16px">
+        <p style="font-size:0.8rem;color:var(--text2);margin:0">
+          Mensaje listo para enviar a <strong style="color:var(--text)">${reemplazoNombre}</strong>:
+        </p>
+        <div style="background:var(--bg3);border-radius:8px;padding:14px;font-size:0.84rem;white-space:pre-wrap;color:var(--text);line-height:1.7;border:1px solid var(--border)">${msg}</div>
+        <a href="${waUrl}" target="_blank" class="btn btn-success" style="justify-content:center;font-size:1rem">
+          <i class="fa-brands fa-whatsapp"></i> Abrir WhatsApp
+        </a>
+      </div>
+    </div>`;
+
+  modalEl.classList.remove('hidden');
+  modalEl.onclick = e => { if (e.target === modalEl) modalEl.classList.add('hidden'); };
+}
+
 async function cargarReemplazos() {
   const url = jornadaActual ? `/api/reemplazos?jornada_id=${jornadaActual}` : '/api/reemplazos';
   const reemplazos = await api(url);
-  const cont = document.getElementById('reemplazos-confirmados');
-  if (reemplazos.length === 0) { cont.innerHTML = ''; return; }
+  const cont  = document.getElementById('reemplazos-confirmados');
+  const wrap  = document.getElementById('wrap-reemplazos');
+  const badge = document.getElementById('badge-reemplazos');
 
-  cont.innerHTML = `
-    <div class="card" style="border-color:rgba(46,204,113,0.3);margin-bottom:16px">
-      <h3 style="color:var(--success);margin-bottom:14px"><i class="fa-solid fa-circle-check"></i> Reemplazos confirmados</h3>
-      ${reemplazos.map(r => `
-        <div class="reemplazo-item">
-          <div class="reemplazo-info">
-            <div>
-              <span class="reemplazo-nombre">${r.arbitro_reemplazo}</span>
-              <span style="color:var(--text2);font-size:0.85rem"> reemplaza a </span>
-              <span class="reemplazo-nombre">${r.arbitro_original}</span>
-            </div>
-            <div style="font-size:0.8rem;color:var(--text2);margin-top:4px">
-              <i class="fa-solid fa-calendar"></i> ${r.fecha} &nbsp;·&nbsp;
-              <i class="fa-solid fa-trophy"></i> ${r.competicion} &nbsp;·&nbsp;
-              <i class="fa-solid fa-location-dot"></i> ${r.estadio}${r.ciudad ? ', ' + r.ciudad : ''}
-            </div>
-            <div style="font-size:0.78rem;color:var(--text2);margin-top:2px">
-              ${r.partido} · <em>${r.rol}</em>
-            </div>
-          </div>
-          <button class="btn btn-sm btn-danger" onclick="eliminarReemplazo(${r.id})"><i class="fa-solid fa-xmark"></i></button>
+  if (reemplazos.length === 0) {
+    cont.innerHTML = '';
+    wrap.classList.add('hidden');
+    return;
+  }
+
+  badge.textContent = reemplazos.length;
+  wrap.classList.remove('hidden');
+  cont.innerHTML = reemplazos.map(r => `
+    <div class="reemplazo-item">
+      <div class="reemplazo-info">
+        <div>
+          <span class="reemplazo-nombre">${r.arbitro_reemplazo}</span>
+          <span style="color:var(--text2);font-size:0.85rem"> reemplaza a </span>
+          <span class="reemplazo-nombre">${r.arbitro_original}</span>
         </div>
-      `).join('')}
-    </div>`;
+        <div style="font-size:0.8rem;color:var(--text2);margin-top:4px">
+          <i class="fa-solid fa-calendar"></i> ${r.fecha} &nbsp;·&nbsp;
+          <i class="fa-solid fa-trophy"></i> ${r.competicion} &nbsp;·&nbsp;
+          <i class="fa-solid fa-location-dot"></i> ${r.estadio}${r.ciudad ? ', ' + r.ciudad : ''}
+        </div>
+        <div style="font-size:0.78rem;color:var(--text2);margin-top:2px">
+          ${r.partido} · <em>${r.rol}</em>
+        </div>
+      </div>
+      <button class="btn btn-sm btn-danger" onclick="eliminarReemplazo(${r.id})"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+  `).join('');
 }
 
 async function eliminarReemplazo(id) {
@@ -594,9 +722,9 @@ async function cargarArbitros() {
         </thead>
         <tbody>
           ${arbitros.map((a, i) => `
-            <tr>
+            <tr id="arb-row-${a.id}">
               <td class="rank">${i + 1}</td>
-              <td class="arb-name">${a.nombre}</td>
+              <td class="arb-name" id="arb-name-${a.id}">${a.nombre}</td>
               <td class="num">${a.por_rol['Árbitro'] || 0}</td>
               <td class="num">${a.por_rol['1° árbitro asistente'] || 0}</td>
               <td class="num">${a.por_rol['2° árbitro asistente'] || 0}</td>
@@ -610,7 +738,12 @@ async function cargarArbitros() {
                   ${a.telefono ? `<a href="https://wa.me/${a.telefono.replace(/\D/g,'')}" target="_blank" class="btn-wa" title="Abrir WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>` : ''}
                 </div>
               </td>
-              <td><button class="btn btn-sm btn-danger" onclick="eliminarArbitro(${a.id})"><i class="fa-solid fa-trash"></i></button></td>
+              <td id="arb-acc-${a.id}">
+                <div style="display:flex;gap:6px;justify-content:flex-end">
+                  <button class="btn btn-sm btn-ghost" onclick="iniciarEdicionNombre(${a.id})" title="Editar nombre"><i class="fa-solid fa-pen"></i></button>
+                  <button class="btn btn-sm btn-danger" onclick="eliminarArbitro(${a.id})" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
+                </div>
+              </td>
             </tr>
           `).join('')}
         </tbody>
@@ -728,6 +861,198 @@ async function eliminarArbitro(id) {
   }
 }
 
+function iniciarEdicionNombre(id) {
+  const celdaNombre = document.getElementById(`arb-name-${id}`);
+  const celdaAcc    = document.getElementById(`arb-acc-${id}`);
+  const nombreActual = celdaNombre.textContent.trim();
+
+  // Crear el input programáticamente para que el value con Ñ, tildes, etc.
+  // se asigne como propiedad y no como atributo HTML (evita problemas de encoding)
+  celdaNombre.innerHTML = `<input id="arb-edit-${id}" class="arb-edit-input" type="text" />`;
+  const input = document.getElementById(`arb-edit-${id}`);
+  input.value = nombreActual;
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter')  { e.preventDefault(); guardarNombreArbitro(id); }
+    if (e.key === 'Escape') { e.preventDefault(); cancelarEdicionNombre(id); }
+  });
+
+  celdaAcc.innerHTML = `
+    <div style="display:flex;gap:6px;justify-content:flex-end">
+      <button class="btn btn-sm btn-success" onclick="guardarNombreArbitro(${id})" title="Guardar">
+        <i class="fa-solid fa-check"></i>
+      </button>
+      <button class="btn btn-sm btn-ghost" onclick="cancelarEdicionNombre(${id})" title="Cancelar">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>`;
+
+  input.focus();
+  input.select();
+}
+
+async function guardarNombreArbitro(id) {
+  const input = document.getElementById(`arb-edit-${id}`);
+  if (!input) return;
+  // Conservar Ñ, tildes y caracteres especiales exactamente como los escribió el usuario.
+  // El backend aplica .upper() para normalizar mayúsculas.
+  const nuevoNombre = input.value.trim();
+  if (!nuevoNombre) { toast('El nombre no puede estar vacío', 'error'); return; }
+
+  try {
+    await api(`/api/arbitros/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombre: nuevoNombre }),
+    });
+    toast('Nombre actualizado ✓');
+    cargarArbitros();
+  } catch (e) {
+    toast(`Error: ${e.message}`, 'error');
+  }
+}
+
+function cancelarEdicionNombre(id) {
+  cargarArbitros();
+}
+
+// ─── Estadísticas ─────────────────────────────────────────────────────────────
+let statsData = [];
+
+async function cargarStats() {
+  const res = await api('/api/stats');
+  if (res.data && res.data.length > 0) {
+    statsData = res.data;
+    renderStats(res.filename);
+  }
+}
+
+async function cargarStatsExcel(input) {
+  if (!input.files[0]) return;
+  const fd = new FormData();
+  fd.append('file', input.files[0]);
+  try {
+    const res = await api('/api/stats/importar', { method: 'POST', body: fd });
+    statsData = res.data;
+    renderStats(res.filename);
+    toast(`✓ ${res.data.length} árbitros cargados`);
+  } catch(e) {
+    toast('Error: ' + e.message, 'error');
+  }
+}
+
+async function revincularStats() {
+  try {
+    const res = await api('/api/stats/revincular', { method: 'POST' });
+    statsData = res.data;
+    renderStats(res.filename);
+    toast('✓ Stats re-vinculadas con la DB');
+  } catch(e) {
+    toast('Error: ' + e.message, 'error');
+  }
+}
+
+function renderStats(filename) {
+  document.getElementById('stats-empty').style.display = 'none';
+  document.getElementById('stats-resumen').classList.remove('hidden');
+  document.getElementById('stats-filtros').style.display = 'flex';
+  document.getElementById('stats-tabla-wrap').classList.remove('hidden');
+  document.getElementById('stats-link-info').classList.remove('hidden');
+  if (filename) document.getElementById('stats-fuente').textContent = filename;
+
+  const vinculados   = statsData.filter(a => a.linked);
+  const noVinculados = statsData.filter(a => !a.linked);
+  const total        = statsData.reduce((s, a) => s + a.total, 0);
+  const topArb       = vinculados[0] || statsData[0];
+
+  document.getElementById('stat-total-arb').textContent   = vinculados.length;
+  document.getElementById('stat-total-part').textContent  = total;
+  document.getElementById('stat-top-arb').textContent     = topArb ? topArb.nombre.split(',')[0].trim() : '—';
+  document.getElementById('stat-promedio').textContent    = vinculados.length ? (vinculados.reduce((s,a)=>s+a.total,0) / vinculados.length).toFixed(1) : 0;
+
+  // Badge de no vinculados
+  const badge = document.getElementById('stat-no-vinculados');
+  if (badge) badge.textContent = noVinculados.length > 0 ? `${noVinculados.length} sin vincular` : '✓ todos vinculados';
+
+  filtrarStats();
+}
+
+function filtrarStats() {
+  const buscar       = (document.getElementById('stats-buscar').value || '').toLowerCase();
+  const orden        = document.getElementById('stats-orden').value;
+  const mostrarNoVin = document.getElementById('stats-show-unlinked')?.checked ?? true;
+
+  let lista = statsData.filter(a => {
+    if (!mostrarNoVin && !a.linked) return false;
+    if (buscar) {
+      const hayMatch = a.nombre.toLowerCase().includes(buscar)
+        || (a.nombres_excel || []).some(n => n.toLowerCase().includes(buscar));
+      return hayMatch;
+    }
+    return true;
+  });
+
+  if (orden === 'arbitro') lista.sort((a,b) => b.arbitro_principal - a.arbitro_principal);
+  else if (orden === 'nombre') lista.sort((a,b) => a.nombre.localeCompare(b.nombre));
+  else lista.sort((a,b) => b.total - a.total);
+
+  // Vinculados primero (salvo que se ordene por nombre A-Z)
+  if (orden !== 'nombre') {
+    lista.sort((a,b) => (b.linked ? 1 : 0) - (a.linked ? 1 : 0));
+  }
+
+  const tbody = document.getElementById('stats-tbody');
+  tbody.innerHTML = lista.map((a, i) => {
+    const torneosStr = Object.entries(a.torneos)
+      .sort((x,y) => y[1]-x[1])
+      .map(([t,n]) => `<span class="torneo-tag">${t.replace('CLUBES','').replace('LIGAS','L').trim()} <b>${n}</b></span>`)
+      .join('');
+
+    const linkIcon = a.linked
+      ? `<span class="stats-link-dot linked" title="Vinculado a árbitro en DB"></span>`
+      : `<span class="stats-link-dot unlinked" title="No encontrado en la DB: ${(a.nombres_excel||[a.nombre]).join(' / ')}">?</span>`;
+
+    const excelHint = (!a.linked && a.nombres_excel?.length)
+      ? `<div class="stats-excel-hint">${a.nombres_excel.join(' / ')}</div>` : '';
+
+    const rowClass = a.linked ? '' : 'stats-row-unlinked';
+
+    return `<tr class="${rowClass}">
+      <td class="rank-num">${i+1}</td>
+      <td class="arb-nombre">${linkIcon}<strong>${a.nombre}</strong>${excelHint}</td>
+      <td class="num-total"><span class="badge-total">${a.total}</span></td>
+      <td class="num-rol" title="Árbitro Principal">${a.arbitro_principal > 0 ? `<span class="rol-badge principal">${a.arbitro_principal}</span>` : '<span style="opacity:.3">—</span>'}</td>
+      <td class="num-rol">${a.primer_asistente > 0 ? `<span class="rol-badge ast1">${a.primer_asistente}</span>` : '<span style="opacity:.3">—</span>'}</td>
+      <td class="num-rol">${a.segundo_asistente > 0 ? `<span class="rol-badge ast2">${a.segundo_asistente}</span>` : '<span style="opacity:.3">—</span>'}</td>
+      <td class="num-rol">${a.cuarto_arbitro > 0 ? `<span class="rol-badge cuarto">${a.cuarto_arbitro}</span>` : '<span style="opacity:.3">—</span>'}</td>
+      <td style="color:var(--text2);font-size:0.82rem">${a.jornadas}</td>
+      <td style="font-size:0.75rem">${torneosStr}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ─── Vista móvil / escritorio ─────────────────────────────────────────────────
+function setViewMode(mode, save = true) {
+  document.body.classList.remove('view-desktop', 'view-mobile');
+  document.body.classList.add(`view-${mode}`);
+  const icon = document.getElementById('view-icon');
+  if (icon) icon.className = mode === 'mobile' ? 'fa-solid fa-display' : 'fa-solid fa-mobile-screen';
+  if (save) localStorage.setItem('viewMode', mode);
+}
+
+function toggleViewMode() {
+  const isMobile = document.body.classList.contains('view-mobile');
+  setViewMode(isMobile ? 'desktop' : 'mobile');
+}
+
+function initViewMode() {
+  const saved = localStorage.getItem('viewMode');
+  const auto  = window.innerWidth < 768 ? 'mobile' : 'desktop';
+  setViewMode(saved || auto, false);
+}
+
+document.getElementById('btn-view-toggle')?.addEventListener('click', toggleViewMode);
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
+initViewMode();
 cargarJornadas();
 cargarPartidos();
