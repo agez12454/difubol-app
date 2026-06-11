@@ -1097,23 +1097,27 @@ def stats_desde_db(jornada_id: Optional[int] = None, db: Session = Depends(get_d
         "2° árbitro asistente":  "segundo_asistente",
         "Cuarto árbitro":        "cuarto_arbitro",
     }
+    # Partir de TODOS los árbitros activos
+    arbitros = db.query(Arbitro).filter(Arbitro.activo == True).all()
+    acum = {
+        arb.id: {
+            "nombre": arb.nombre, "arbitro_id": arb.id,
+            "total": 0, "arbitro_principal": 0,
+            "primer_asistente": 0, "segundo_asistente": 0,
+            "cuarto_arbitro": 0,
+            "jornadas_set": set(), "torneos": {},
+            "linked": True, "nombres_excel": [],
+        }
+        for arb in arbitros
+    }
+    # Cruzar con asignaciones
     q = db.query(AsignacionPartido).join(Partido).join(Arbitro, AsignacionPartido.arbitro_id == Arbitro.id)
     if jornada_id:
         q = q.filter(Partido.jornada_id == jornada_id)
-
-    acum: dict = {}
     for asig in q.all():
-        arb = asig.arbitro
-        if arb.id not in acum:
-            acum[arb.id] = {
-                "nombre": arb.nombre, "arbitro_id": arb.id,
-                "total": 0, "arbitro_principal": 0,
-                "primer_asistente": 0, "segundo_asistente": 0,
-                "cuarto_arbitro": 0,
-                "jornadas_set": set(), "torneos": {},
-                "linked": True, "nombres_excel": [],
-            }
-        e = acum[arb.id]
+        if asig.arbitro_id not in acum:
+            continue
+        e = acum[asig.arbitro_id]
         e["total"] += 1
         campo = ROL_MAP.get(asig.rol)
         if campo:
