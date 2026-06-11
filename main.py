@@ -1125,7 +1125,8 @@ def stats_desde_db(jornada_id: Optional[int] = None, db: Session = Depends(get_d
         if asig.partido.jornada_id:
             e["jornadas_set"].add(asig.partido.jornada_id)
         if asig.partido.competicion:
-            comp = asig.partido.competicion
+            comp = re.sub(r'\b\d{4}\b', '', asig.partido.competicion).strip(' /-').upper()
+            comp = re.sub(r'\s+', ' ', comp)
             e["torneos"][comp] = e["torneos"].get(comp, 0) + 1
 
     result = []
