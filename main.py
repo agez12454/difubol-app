@@ -1058,29 +1058,66 @@ async def importar_stats_excel(file: UploadFile = File(...), db: Session = Depen
     ws = wb.active
     filename = file.filename or "Excel"
 
+    rows = list(ws.iter_rows(values_only=True))
+    if not rows:
+        raise HTTPException(status_code=400, detail="Excel vacío")
+
     stats_raw = defaultdict(lambda: {
         "total": 0, "arbitro_principal": 0,
         "primer_asistente": 0, "segundo_asistente": 0,
         "cuarto_arbitro": 0, "torneos": defaultdict(int), "jornadas": set(),
     })
 
-    for row in ws.iter_rows(min_row=2, values_only=True):
-        if row[0] is None:
-            continue
-        torneo = str(row[1] or "").strip()
-        fecha  = row[3]
-        roles_nombres = [
-            ("arbitro_principal",  str(row[8]  or "").strip()),
-            ("primer_asistente",   str(row[9]  or "").strip()),
-            ("segundo_asistente",  str(row[10] or "").strip()),
-            ("cuarto_arbitro",     str(row[11] or "").strip()),
-        ]
-        for rol_key, nombre in roles_nombres:
-            if nombre:
-                stats_raw[nombre]["total"] += 1
-                stats_raw[nombre][rol_key] += 1
-                stats_raw[nombre]["torneos"][torneo] += 1
-                stats_raw[nombre]["jornadas"].add(fecha)
+    # Detectar formato: fila 1 col 0 == "ÁRBITRO" → formato resumen
+    header0 = str(rows[0][0] or "").strip().upper().replace("�", "A")
+    if "RBITRO" in header0 and len(rows) > 2:
+        # ── Formato resumen (pivot): árbitros como filas ──
+        SUB_MAP = {"ÁRB": "arbitro_principal", "ARB": "arbitro_principal",
+                   "AS1": "primer_asistente", "AS2": "segundo_asistente",
+                   "4TO": "cuarto_arbitro"}
+        # Leer competiciones de fila 1 y sub-headers de fila 2
+        comp_actual = None
+        col_info = {}  # col_index → (competicion, rol_key)
+        for ci, val in enumerate(rows[0]):
+            if val and ci > 0:
+                comp_actual = str(val).strip().upper()
+        # Reconstruir con columnas reales
+        comp_actual = None
+        for ci, val in enumerate(rows[0]):
+            if val and ci > 0:
+                comp_actual = str(val).strip().upper()
+            if comp_actual and ci > 0:
+                sub = str(rows[1][ci] or "").strip().upper() if len(rows) > 1 else ""
+                rol_key = SUB_MAP.get(sub)
+                if rol_key and "TOTAL" not in comp_actual:
+                    col_info[ci] = (comp_actual, rol_key)
+
+        for row in rows[2:]:
+            nombre = str(row[0] or "").strip().upper()
+            if not nombre:
+                continue
+            for ci, (comp, rol_key) in col_info.items():
+                val = row[ci] if ci < len(row) else None
+                n = int(val) if val and str(val).isdigit() else (int(val) if isinstance(val, (int, float)) and val else 0)
+                if n:
+                    stats_raw[nombre][rol_key] += n
+                    stats_raw[nombre]["total"] += n
+                    stats_raw[nombre]["torneos"][comp] += n
+    else:
+        # ── Formato original: una fila por partido ──
+        for row in rows[1:]:
+            if row[0] is None:
+                continue
+            torneo = str(row[1] or "").strip()
+            fecha  = row[3]
+            for rol_key, col in [("arbitro_principal", 8), ("primer_asistente", 9),
+                                  ("segundo_asistente", 10), ("cuarto_arbitro", 11)]:
+                nombre = str(row[col] or "").strip() if col < len(row) else ""
+                if nombre:
+                    stats_raw[nombre]["total"] += 1
+                    stats_raw[nombre][rol_key] += 1
+                    stats_raw[nombre]["torneos"][torneo] += 1
+                    stats_raw[nombre]["jornadas"].add(fecha)
 
     data = _vincular_con_db(stats_raw, db)
     cache = {"filename": filename, "data": data}
