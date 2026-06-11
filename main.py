@@ -1089,6 +1089,49 @@ async def importar_stats_excel(file: UploadFile = File(...), db: Session = Depen
     return cache
 
 
+@app.get("/api/stats/desde-db")
+def stats_desde_db(jornada_id: Optional[int] = None, db: Session = Depends(get_db)):
+    ROL_MAP = {
+        "Árbitro":               "arbitro_principal",
+        "1° árbitro asistente":  "primer_asistente",
+        "2° árbitro asistente":  "segundo_asistente",
+        "Cuarto árbitro":        "cuarto_arbitro",
+    }
+    q = db.query(AsignacionPartido).join(Partido).join(Arbitro, AsignacionPartido.arbitro_id == Arbitro.id)
+    if jornada_id:
+        q = q.filter(Partido.jornada_id == jornada_id)
+
+    acum: dict = {}
+    for asig in q.all():
+        arb = asig.arbitro
+        if arb.id not in acum:
+            acum[arb.id] = {
+                "nombre": arb.nombre, "arbitro_id": arb.id,
+                "total": 0, "arbitro_principal": 0,
+                "primer_asistente": 0, "segundo_asistente": 0,
+                "cuarto_arbitro": 0,
+                "jornadas_set": set(), "torneos": {},
+                "linked": True, "nombres_excel": [],
+            }
+        e = acum[arb.id]
+        e["total"] += 1
+        campo = ROL_MAP.get(asig.rol)
+        if campo:
+            e[campo] += 1
+        if asig.partido.jornada_id:
+            e["jornadas_set"].add(asig.partido.jornada_id)
+        if asig.partido.competicion:
+            comp = asig.partido.competicion
+            e["torneos"][comp] = e["torneos"].get(comp, 0) + 1
+
+    result = []
+    for e in acum.values():
+        e["jornadas"] = len(e.pop("jornadas_set"))
+        result.append(e)
+    result.sort(key=lambda x: x["total"], reverse=True)
+    return {"source": "db", "data": result}
+
+
 @app.get("/api/stats")
 def obtener_stats():
     if not os.path.exists(STATS_CACHE_PATH):

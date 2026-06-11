@@ -922,6 +922,15 @@ function cancelarEdicionNombre(id) {
 let statsData = [];
 
 async function cargarStats() {
+  try {
+    const res = await api('/api/stats/desde-db');
+    if (res.data && res.data.length > 0) {
+      statsData = res.data;
+      renderStats('App (sincronizado)');
+      return;
+    }
+  } catch(_) {}
+  // fallback al cache de Excel
   const res = await api('/api/stats');
   if (res.data && res.data.length > 0) {
     statsData = res.data;
