@@ -489,6 +489,7 @@ def guardar_partido(data: PartidoManual, jornada_id: Optional[int] = None, db: S
         db.add(a)
 
     db.commit()
+    db.expire_all()
     conflictos = detectar_conflictos(partido.id, db)
     return {
         "id": partido.id,
@@ -530,6 +531,7 @@ def actualizar_partido(partido_id: int, data: PartidoManual, db: Session = Depen
         db.add(AsignacionPartido(partido_id=partido.id, arbitro_id=arbitro.id, rol=asig["rol"]))
 
     db.commit()
+    db.expire_all()  # forzar recarga para que detectar_conflictos vea la fecha actualizada
     conflictos = detectar_conflictos(partido.id, db)
     return {"id": partido.id, "conflictos": conflictos, "tiene_conflicto": len(conflictos) > 0}
 
