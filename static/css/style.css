@@ -354,10 +354,20 @@ main { max-width: 1140px; margin: 0 auto; padding: 28px 16px; }
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border);
+  padding: 4px 0;
   flex-wrap: wrap;
+  user-select: none;
+}
+.partido-detalle {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.partido-chevron {
+  font-size: 0.7rem;
+  color: var(--text2);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
 }
 .partido-equipos {
   font-size: 1rem;

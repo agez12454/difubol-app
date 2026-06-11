@@ -341,16 +341,18 @@ async function cargarPartidos() {
     const conflictoArbitros = [...new Set(p.conflictos.map(c => c.arbitro_id))];
     return `
     <div class="partido-card ${p.tiene_conflicto ? 'conflicto' : ''}" id="partido-${p.id}">
-      <div class="partido-header">
+      <div class="partido-header" onclick="togglePartido(${p.id})" style="cursor:pointer">
         <div class="partido-equipos">
+          <i class="fa-solid fa-chevron-right partido-chevron" id="chevron-${p.id}"></i>
           ${p.equipo_local} <span class="vs">vs</span> ${p.equipo_visitante}
           ${p.tiene_conflicto ? `<span class="conflicto-tag"><i class="fa-solid fa-triangle-exclamation"></i> ${p.conflictos.length} conflicto${p.conflictos.length > 1 ? 's' : ''}</span>` : ''}
         </div>
-        <div style="display:flex;gap:8px;flex-shrink:0">
+        <div style="display:flex;gap:8px;flex-shrink:0" onclick="event.stopPropagation()">
           <button class="btn btn-sm btn-ghost" onclick="editarPartido(${p.id})"><i class="fa-solid fa-pen"></i></button>
           <button class="btn btn-sm btn-danger" onclick="eliminarPartido(${p.id})"><i class="fa-solid fa-trash"></i></button>
         </div>
       </div>
+      <div class="partido-detalle hidden" id="detalle-${p.id}">
       <div class="partido-meta">
         <span><i class="fa-solid fa-trophy"></i> ${p.competicion}</span>
         <span><i class="fa-solid fa-clock"></i> ${p.fecha_hora}</span>
@@ -382,8 +384,17 @@ async function cargarPartidos() {
           </div>`;
         }).join('')}
       </div>
+      </div>
     </div>`;
   }).join('');
+}
+
+function togglePartido(id) {
+  const detalle = document.getElementById(`detalle-${id}`);
+  const chevron = document.getElementById(`chevron-${id}`);
+  const abierto = !detalle.classList.contains('hidden');
+  detalle.classList.toggle('hidden', abierto);
+  chevron.style.transform = abierto ? '' : 'rotate(90deg)';
 }
 
 async function editarPartido(id) {
