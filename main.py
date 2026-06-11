@@ -1124,3 +1124,30 @@ def revincular_stats(db: Session = Depends(get_db)):
     with open(STATS_CACHE_PATH, "w", encoding="utf-8") as f:
         json.dump(cache, f, ensure_ascii=False)
     return cache
+
+
+# ─── Restaurar DB (uso único para migración) ──────────────────────────────────
+from database import _db_path as _DB_FILE_PATH
+from fastapi.responses import HTMLResponse
+
+@app.get("/admin/restaurar-db", response_class=HTMLResponse)
+async def restaurar_db_form():
+    return """
+    <html><body style="font-family:sans-serif;max-width:400px;margin:60px auto;padding:20px">
+    <h2>Restaurar base de datos</h2>
+    <form method="post" enctype="multipart/form-data">
+      <p><label>Clave:<br><input type="password" name="clave" style="width:100%;padding:8px;margin-top:4px"></label></p>
+      <p><label>Archivo .db:<br><input type="file" name="file" accept=".db" style="margin-top:4px"></label></p>
+      <button type="submit" style="background:#0099CC;color:#fff;border:none;padding:10px 20px;border-radius:6px;cursor:pointer">Subir DB</button>
+    </form>
+    </body></html>
+    """
+
+@app.post("/admin/restaurar-db")
+async def restaurar_db(file: UploadFile = File(...), clave: str = ""):
+    if clave != os.getenv("ADMIN_CLAVE", ""):
+        raise HTTPException(status_code=403, detail="Clave incorrecta")
+    contenido = await file.read()
+    with open(_DB_FILE_PATH, "wb") as f:
+        f.write(contenido)
+    return HTMLResponse("<html><body style='font-family:sans-serif;max-width:400px;margin:60px auto'><h2>✅ Base de datos restaurada correctamente</h2><a href='/'>Ir a la app</a></body></html>")
