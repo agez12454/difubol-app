@@ -344,8 +344,18 @@ async function cargarPartidos() {
       <div class="partido-header" onclick="togglePartido(${p.id})" style="cursor:pointer">
         <div class="partido-equipos">
           <i class="fa-solid fa-chevron-right partido-chevron" id="chevron-${p.id}"></i>
-          ${p.equipo_local} <span class="vs">vs</span> ${p.equipo_visitante}
-          ${p.tiene_conflicto ? `<span class="conflicto-tag"><i class="fa-solid fa-triangle-exclamation"></i> ${p.conflictos.length} conflicto${p.conflictos.length > 1 ? 's' : ''}</span>` : ''}
+          <div>
+            <div class="partido-equipos-nombres">
+              ${p.equipo_local} <span class="vs">vs</span> ${p.equipo_visitante}
+              ${p.tiene_conflicto ? `<span class="conflicto-tag"><i class="fa-solid fa-triangle-exclamation"></i> ${p.conflictos.length} conflicto${p.conflictos.length > 1 ? 's' : ''}</span>` : ''}
+            </div>
+            <div class="partido-mini-meta">
+              ${p.competicion ? `<span><i class="fa-solid fa-trophy"></i> ${p.competicion}</span>` : ''}
+              ${p.fecha_hora ? `<span><i class="fa-solid fa-clock"></i> ${p.fecha_hora}</span>` : ''}
+              ${p.estadio ? `<span><i class="fa-solid fa-location-dot"></i> ${p.estadio}</span>` : ''}
+              ${p.ciudad ? `<span><i class="fa-solid fa-city"></i> ${p.ciudad}</span>` : ''}
+            </div>
+          </div>
         </div>
         <div style="display:flex;gap:8px;flex-shrink:0" onclick="event.stopPropagation()">
           <button class="btn btn-sm btn-ghost" onclick="editarPartido(${p.id})"><i class="fa-solid fa-pen"></i></button>
