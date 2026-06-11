@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 import httpx
 
-from database import get_db, init_db, Arbitro, Partido, AsignacionPartido, Reemplazo, Jornada  # noqa: E402
+from database import get_db, init_db, Arbitro, Partido, AsignacionPartido, Reemplazo, Jornada, ConflictoIgnorado  # noqa: E402
 
 load_dotenv()
 init_db()
@@ -114,6 +114,14 @@ def detectar_conflictos(partido_id: int, db: Session):
             )
 
             if mismo_dia or solapan:
+                # Verificar si este conflicto fue ignorado
+                ignorado = db.query(ConflictoIgnorado).filter(
+                    ConflictoIgnorado.arbitro_id == asig.arbitro_id,
+                    ConflictoIgnorado.partido_a_id.in_([partido_id, otro_partido.id]),
+                    ConflictoIgnorado.partido_b_id.in_([partido_id, otro_partido.id]),
+                ).first()
+                if ignorado:
+                    continue
                 conflictos.append(
                     {
                         "arbitro_id": asig.arbitro_id,
@@ -646,6 +654,32 @@ def todos_los_conflictos(jornada_id: Optional[int] = None, db: Session = Depends
 @app.get("/api/sugerencias/{arbitro_id}/{partido_id}")
 def sugerencias(arbitro_id: int, partido_id: int, db: Session = Depends(get_db)):
     return sugerir_reemplazos(arbitro_id, partido_id, db)
+
+
+# ─── Ignorar conflictos ──────────────────────────────────────────────────────
+
+@app.post("/api/conflictos/ignorar")
+def ignorar_conflicto(arbitro_id: int, partido_a_id: int, partido_b_id: int, db: Session = Depends(get_db)):
+    existe = db.query(ConflictoIgnorado).filter(
+        ConflictoIgnorado.arbitro_id == arbitro_id,
+        ConflictoIgnorado.partido_a_id.in_([partido_a_id, partido_b_id]),
+        ConflictoIgnorado.partido_b_id.in_([partido_a_id, partido_b_id]),
+    ).first()
+    if not existe:
+        db.add(ConflictoIgnorado(arbitro_id=arbitro_id, partido_a_id=partido_a_id, partido_b_id=partido_b_id))
+        db.commit()
+    return {"ok": True}
+
+
+@app.delete("/api/conflictos/ignorar")
+def restaurar_conflicto(arbitro_id: int, partido_a_id: int, partido_b_id: int, db: Session = Depends(get_db)):
+    db.query(ConflictoIgnorado).filter(
+        ConflictoIgnorado.arbitro_id == arbitro_id,
+        ConflictoIgnorado.partido_a_id.in_([partido_a_id, partido_b_id]),
+        ConflictoIgnorado.partido_b_id.in_([partido_a_id, partido_b_id]),
+    ).delete(synchronize_session=False)
+    db.commit()
+    return {"ok": True}
 
 
 # ─── Reemplazos ──────────────────────────────────────────────────────────────

@@ -377,7 +377,7 @@ async function cargarPartidos() {
               <span class="rol">${a.rol}:</span>
               <span class="nombre ${a.reemplazo ? 'nombre-reemplazado' : ''}">${a.nombre}</span>
               ${a.reemplazo ? `<span class="reemplazo-inline"><i class="fa-solid fa-arrow-right-arrow-left"></i> ${a.reemplazo}</span>` : ''}
-              ${tieneConflicto ? `<span class="conflicto-tag">⚠ Cruce</span>` : ''}
+              ${tieneConflicto ? `<span class="conflicto-tag">⚠ Cruce <button class="btn-ignorar-conflicto" onclick="ignorarConflicto(event,${a.arbitro_id},${p.id},${p.conflictos.find(c=>c.arbitro_id===a.arbitro_id)?.partido_conflicto_id||0})" title="El árbitro puede ir a los dos — ignorar conflicto">✕ Ignorar</button></span>` : ''}
             </div>
             <div class="oficial-acciones">
               <button class="btn-wa-designacion" onclick="abrirWhatsAppDesignacion(${p.id},${a.id})" title="Enviar designación por WhatsApp">
@@ -397,6 +397,19 @@ async function cargarPartidos() {
       </div>
     </div>`;
   }).join('');
+}
+
+async function ignorarConflicto(event, arbitroId, partidoAId, partidoBId) {
+  event.stopPropagation();
+  if (!partidoBId) return;
+  try {
+    await api(`/api/conflictos/ignorar?arbitro_id=${arbitroId}&partido_a_id=${partidoAId}&partido_b_id=${partidoBId}`, { method: 'POST' });
+    toast('Conflicto ignorado ✓');
+    await cargarPartidos();
+    cargarConflictos();
+  } catch (e) {
+    toast(`Error: ${e.message}`, 'error');
+  }
 }
 
 function togglePartido(id) {

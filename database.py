@@ -85,6 +85,16 @@ class Reemplazo(Base):
     arbitro_reemplazo = relationship("Arbitro", foreign_keys=[arbitro_reemplazo_id])
 
 
+class ConflictoIgnorado(Base):
+    __tablename__ = "conflictos_ignorados"
+
+    id = Column(Integer, primary_key=True, index=True)
+    arbitro_id = Column(Integer, ForeignKey("arbitros.id"))
+    partido_a_id = Column(Integer, ForeignKey("partidos.id"))
+    partido_b_id = Column(Integer, ForeignKey("partidos.id"))
+    creado_en = Column(DateTime, default=datetime.utcnow)
+
+
 def get_db():
     db = SessionLocal()
     try:
@@ -101,6 +111,7 @@ def init_db():
         "ALTER TABLE arbitros ADD COLUMN telefono VARCHAR",
         "ALTER TABLE asignaciones ADD COLUMN confirmado BOOLEAN DEFAULT 0",
         "ALTER TABLE partidos ADD COLUMN imagen_url VARCHAR",
+        "CREATE TABLE IF NOT EXISTS conflictos_ignorados (id INTEGER PRIMARY KEY, arbitro_id INTEGER, partido_a_id INTEGER, partido_b_id INTEGER, creado_en DATETIME)",
     ]
     with engine.connect() as conn:
         for sql in migraciones:

@@ -476,6 +476,18 @@ main { max-width: 1140px; margin: 0 auto; padding: 28px 16px; }
 }
 .btn-confirmar:hover { border-color: var(--success); color: var(--success); }
 .btn-confirmar.confirmado { border-color: var(--success); color: var(--success); background: rgba(61,190,122,0.08); }
+.btn-ignorar-conflicto {
+  background: none;
+  border: none;
+  border-left: 1px solid currentColor;
+  color: inherit;
+  font-size: 0.7rem;
+  cursor: pointer;
+  margin-left: 5px;
+  padding: 0 4px;
+  opacity: 0.75;
+}
+.btn-ignorar-conflicto:hover { opacity: 1; }
 
 /* ─── Teléfono árbitros ──────────────────────────── */
 .telefono-cell { display: flex; align-items: center; gap: 6px; }
