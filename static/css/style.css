@@ -489,6 +489,17 @@ main { max-width: 1140px; margin: 0 auto; padding: 28px 16px; }
 }
 .btn-ignorar-conflicto:hover { opacity: 1; }
 
+/* ─── Badge confirmaciones ───────────────────────────── */
+.conf-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 0.72rem; font-weight: 700; line-height: 1;
+  padding: 3px 7px; border-radius: 20px; letter-spacing: 0.02em;
+  min-width: 34px; margin-left: 6px;
+}
+.conf-badge-none    { background: rgba(120,120,140,0.15); color: var(--text-muted); }
+.conf-badge-partial { background: rgba(255,165,0,0.18);   color: #f5a623; }
+.conf-badge-full    { background: rgba(61,190,122,0.18);   color: var(--success); }
+
 /* ─── Teléfono árbitros ──────────────────────────── */
 .telefono-cell { display: flex; align-items: center; gap: 6px; }
 .telefono-input {

@@ -357,7 +357,13 @@ async function cargarPartidos() {
             </div>
           </div>
         </div>
-        <div style="display:flex;gap:8px;flex-shrink:0" onclick="event.stopPropagation()">
+        <div style="display:flex;gap:8px;flex-shrink:0;align-items:center" onclick="event.stopPropagation()">
+          ${(() => {
+            const conf = p.asignaciones.filter(a => a.confirmado).length;
+            const tot  = p.asignaciones.length;
+            const cls  = conf === tot && tot > 0 ? 'conf-badge-full' : conf > 0 ? 'conf-badge-partial' : 'conf-badge-none';
+            return `<span class="conf-badge ${cls}" id="conf-badge-${p.id}" title="Confirmaciones">${conf}/${tot}</span>`;
+          })()}
           <button class="btn btn-sm btn-ghost" onclick="editarPartido(${p.id})"><i class="fa-solid fa-pen"></i></button>
           <button class="btn btn-sm btn-danger" onclick="eliminarPartido(${p.id})"><i class="fa-solid fa-trash"></i></button>
         </div>
@@ -451,6 +457,20 @@ async function toggleConfirmacion(asignacionId, btn) {
     btn.className = `btn-confirmar ${res.confirmado ? 'confirmado' : ''}`;
     btn.title = res.confirmado ? 'Confirmado — clic para desmarcar' : 'Marcar como confirmado';
     btn.innerHTML = `<i class="fa-solid ${res.confirmado ? 'fa-circle-check' : 'fa-circle'}"></i> ${res.confirmado ? 'Confirmado' : 'Confirmar'}`;
+
+    // Actualizar contador del card
+    const card = btn.closest('.partido-card');
+    if (card) {
+      const partidoId = card.id.replace('partido-', '');
+      const badge = document.getElementById(`conf-badge-${partidoId}`);
+      if (badge) {
+        const btns = card.querySelectorAll('.btn-confirmar');
+        const conf = [...btns].filter(b => b.classList.contains('confirmado')).length;
+        const tot  = btns.length;
+        badge.textContent = `${conf}/${tot}`;
+        badge.className = `conf-badge ${conf === tot && tot > 0 ? 'conf-badge-full' : conf > 0 ? 'conf-badge-partial' : 'conf-badge-none'}`;
+      }
+    }
   } catch (e) {
     toast(`Error: ${e.message}`, 'error');
   }
