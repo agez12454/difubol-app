@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import httpx
+import anthropic
 
 from database import get_db, init_db, Arbitro, Partido, AsignacionPartido, Reemplazo, Jornada, ConflictoIgnorado  # noqa: E402
 
@@ -196,7 +197,7 @@ def sugerir_reemplazos(arbitro_id: int, partido_id: int, db: Session):
 
 
 def extraer_datos_imagen(imagen_b64: str, media_type: str) -> dict:
-    """Usa Gemini Vision para extraer datos del partido desde la imagen."""
+    """Usa Claude Haiku para extraer datos del partido desde la imagen."""
     prompt = """Analiza esta imagen de un sistema de gestión de partidos de fútbol y extrae los datos indicados.
 
 Responde ÚNICAMENTE con un JSON válido con esta estructura exacta (sin texto adicional):
@@ -221,32 +222,26 @@ IMPORTANTE:
 - Si un campo no aparece, usa cadena vacía ""
 - El JSON debe ser válido y completo"""
 
-    api_key = os.getenv("OPENROUTER_API_KEY", "")
-    with httpx.Client(timeout=60.0) as client:
-        resp = client.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "http://localhost:8000",
-                "X-Title": "Gestor de Arbitros",
-            },
-            json={
-                "model": "nvidia/nemotron-nano-12b-v2-vl:free",
-                "messages": [{
-                    "role": "user",
-                    "content": [
-                        {"type": "image_url", "image_url": {"url": f"data:{media_type};base64,{imagen_b64}"}},
-                        {"type": "text", "text": prompt},
-                    ],
-                }],
-            },
-        )
-    data = resp.json()
-    if "error" in data:
-        raise Exception(str(data["error"]))
-    text = data["choices"][0]["message"]["content"].strip()
-    # Extraer JSON si viene con markdown
+    client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
+    resp = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=1024,
+        messages=[{
+            "role": "user",
+            "content": [
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": media_type,
+                        "data": imagen_b64,
+                    },
+                },
+                {"type": "text", "text": prompt},
+            ],
+        }],
+    )
+    text = resp.content[0].text.strip()
     match = re.search(r"\{.*\}", text, re.DOTALL)
     if match:
         text = match.group(0)
