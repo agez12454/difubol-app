@@ -270,6 +270,34 @@ document.getElementById('btn-guardar-partido').addEventListener('click', async (
   }
 });
 
+// ─── WhatsApp helper con imagen ──────────────────────────────────────────────
+async function compartirWhatsApp(msg, imagenUrl, telefono) {
+  if (navigator.share) {
+    const shareData = { text: msg };
+    if (imagenUrl) {
+      try {
+        const resp = await fetch(imagenUrl);
+        const blob = await resp.blob();
+        const ext  = blob.type.includes('png') ? 'png' : 'jpg';
+        const file = new File([blob], `partido.${ext}`, { type: blob.type });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          shareData.files = [file];
+        }
+      } catch (_) {}
+    }
+    try {
+      await navigator.share(shareData);
+      return;
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+    }
+  }
+  const url = telefono
+    ? `https://wa.me/${telefono.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`
+    : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+  window.open(url, '_blank');
+}
+
 // ─── WhatsApp designación ─────────────────────────────────────────────────────
 function abrirWhatsAppDesignacion(partidoId, asignacionId) {
   const p = partidosData.find(x => x.id === partidoId);
@@ -313,7 +341,7 @@ Estimado(a) *${a.nombre}*
 
 Por favor confirme su asistencia.`;
 
-  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+  compartirWhatsApp(msg, p.imagen_url || null, a.telefono || null);
 }
 
 // ─── Lista de partidos ────────────────────────────────────────────────────────
@@ -704,9 +732,10 @@ Por favor confirme su asistencia.`;
           Mensaje listo para enviar a <strong style="color:var(--text)">${reemplazoNombre}</strong>:
         </p>
         <div style="background:var(--bg3);border-radius:8px;padding:14px;font-size:0.84rem;white-space:pre-wrap;color:var(--text);line-height:1.7;border:1px solid var(--border)">${msg}</div>
-        <a href="${waUrl}" target="_blank" class="btn btn-success" style="justify-content:center;font-size:1rem">
-          <i class="fa-brands fa-whatsapp"></i> Abrir WhatsApp
-        </a>
+        <button class="btn btn-success" style="justify-content:center;font-size:1rem;width:100%"
+          onclick="compartirWhatsApp(${JSON.stringify(msg)}, ${JSON.stringify(partido?.imagen_url || null)}, ${JSON.stringify(telefono || null)})">
+          <i class="fa-brands fa-whatsapp"></i> Enviar por WhatsApp
+        </button>
       </div>
     </div>`;
 
