@@ -271,7 +271,7 @@ document.getElementById('btn-guardar-partido').addEventListener('click', async (
 });
 
 // ─── WhatsApp helper con imagen ──────────────────────────────────────────────
-async function compartirWhatsApp(msg, imagenUrl, telefono) {
+async function compartirWhatsApp(msg, imagenUrl, telefono, msgConImagen = null) {
   if (navigator.share) {
     const shareData = { text: msg };
     if (imagenUrl) {
@@ -282,6 +282,7 @@ async function compartirWhatsApp(msg, imagenUrl, telefono) {
         const file = new File([blob], `partido.${ext}`, { type: blob.type });
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           shareData.files = [file];
+          if (msgConImagen) shareData.text = msgConImagen;
         }
       } catch (_) {}
     }
@@ -734,8 +735,9 @@ Por favor confirme su asistencia.`;
       </div>
     </div>`;
 
+  const msgCorto = `↩️ En reemplazo de: ${originalNombre}\n\nFavor confirmar e informarle al árbitro y a quién reemplaza.`;
   modalEl.querySelector('#btn-wa-notif').addEventListener('click', () => {
-    compartirWhatsApp(msg, partido?.imagen_url || null, telefono || null);
+    compartirWhatsApp(msg, partido?.imagen_url || null, telefono || null, msgCorto);
   });
 
   modalEl.classList.remove('hidden');
