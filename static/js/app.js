@@ -707,10 +707,6 @@ ${cuerpo}
 
 Por favor confirme su asistencia.`;
 
-  const waUrl = telefono
-    ? `https://wa.me/${telefono.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`
-    : `https://wa.me/?text=${encodeURIComponent(msg)}`;
-
   let modalEl = document.getElementById('modal-notif-wa');
   if (!modalEl) {
     modalEl = document.createElement('div');
@@ -732,12 +728,15 @@ Por favor confirme su asistencia.`;
           Mensaje listo para enviar a <strong style="color:var(--text)">${reemplazoNombre}</strong>:
         </p>
         <div style="background:var(--bg3);border-radius:8px;padding:14px;font-size:0.84rem;white-space:pre-wrap;color:var(--text);line-height:1.7;border:1px solid var(--border)">${msg}</div>
-        <button class="btn btn-success" style="justify-content:center;font-size:1rem;width:100%"
-          onclick="compartirWhatsApp(${JSON.stringify(msg)}, ${JSON.stringify(partido?.imagen_url || null)}, ${JSON.stringify(telefono || null)})">
+        <button id="btn-wa-notif" class="btn btn-success" style="justify-content:center;font-size:1rem;width:100%">
           <i class="fa-brands fa-whatsapp"></i> Enviar por WhatsApp
         </button>
       </div>
     </div>`;
+
+  modalEl.querySelector('#btn-wa-notif').addEventListener('click', () => {
+    compartirWhatsApp(msg, partido?.imagen_url || null, telefono || null);
+  });
 
   modalEl.classList.remove('hidden');
   modalEl.onclick = e => { if (e.target === modalEl) modalEl.classList.add('hidden'); };
