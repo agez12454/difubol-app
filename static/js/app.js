@@ -745,11 +745,17 @@ Por favor confirme su asistencia.`;
 }
 
 async function cargarReemplazos() {
-  const url = jornadaActual ? `/api/reemplazos?jornada_id=${jornadaActual}` : '/api/reemplazos';
-  const reemplazos = await api(url);
   const cont  = document.getElementById('reemplazos-confirmados');
   const wrap  = document.getElementById('wrap-reemplazos');
   const badge = document.getElementById('badge-reemplazos');
+
+  if (!jornadaActual) {
+    cont.innerHTML = '';
+    wrap.classList.add('hidden');
+    return;
+  }
+
+  const reemplazos = await api(`/api/reemplazos?jornada_id=${jornadaActual}`);
 
   if (reemplazos.length === 0) {
     cont.innerHTML = '';
